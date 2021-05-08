@@ -3,9 +3,12 @@ package server;
 public class User {
     private String username;
     private String password;
-    public User(String username, String password){
+    private String salt;
+    private boolean online = false;
+    public User(String username, String password, String salt){
         this.username =  username;
         this.password = password;
+        this.salt = salt;
     }
 
     public String getUsername(){
@@ -23,4 +26,8 @@ public class User {
     public String getPassword(){
         return password;
     }
+
+    public String getSalt(){ return this.salt; }
+
+    public void setSalt(String salt) { this.salt = salt; }
 }

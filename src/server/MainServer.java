@@ -1,41 +1,29 @@
 package server;
 
 import interfaces.RemoteSignUpInterface;
+import utils.PasswordHandler;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 
 public class MainServer {
-    private static final String REGISTRY_NAME =  "SIGN-UP-SERVER";
-    private static final int PORT = 6789;
 
-    private static final List<User> registeredUsers = Collections.synchronizedList(new ArrayList<>());
-    private static final List<User> onlineUsers = Collections.synchronizedList(new ArrayList<>());
-    private static final List<Project> projects = Collections.synchronizedList(new ArrayList<>());
-
-
-    public static void main(String[] args){
-        startRMI();
+    //todo handle exceptions
+    public static void main(String[] args) {
+        Server server = new Server("localhost", 6789, 6790);
+        server.start();
     }
 
-    //starting rmi method for user sign up operation
-    private static void startRMI(){
-        try {
-            RemoteSignUp remoteSignUpServer = new RemoteSignUp(registeredUsers);
-            RemoteSignUpInterface stub = (RemoteSignUpInterface) UnicastRemoteObject.exportObject(remoteSignUpServer, PORT);
-            LocateRegistry.createRegistry(PORT);
-            //@todo try to bind to non-localhost address!
-            Registry registry = LocateRegistry.getRegistry("localhost", PORT);
-            registry.rebind("SIGN-UP-SERVER", stub);
-        }catch (RemoteException e){
-            e.printStackTrace();
-            //@todo should exit
-        }
-    }
 }

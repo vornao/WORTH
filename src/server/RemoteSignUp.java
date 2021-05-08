@@ -1,34 +1,35 @@
 package server;
 
 import interfaces.RemoteSignUpInterface;
+import utils.PasswordHandler;
 
-import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.RemoteServer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class RemoteSignUp extends RemoteServer implements RemoteSignUpInterface {
-    private final List<User> userList;
+    private final ConcurrentHashMap<String, User> userList;
 
-    public RemoteSignUp(List<User> userList){
-        this.userList = Collections.synchronizedList(userList);
+    public RemoteSignUp(ConcurrentHashMap<String, User> userList){
+        this.userList = userList;
     }
 
     @Override
     public int signUp(String username, String password) throws RemoteException {
 
+        /** START SYNCHRONIZED BLOCK */
         synchronized (userList){
-            for(User u : userList){
-                if(u.getUsername().equalsIgnoreCase(username)){
-                    System.out.println("> User exists, aborting");
-                    return 2;
-                }
-            }
-            userList.add(new User(username, password));
-            System.out.println("USER CREATED");
+            if (userList.containsKey(username)) return 2;
+            //@todo add persistence
+            String salt = PasswordHandler.salt();
+            String hash = PasswordHandler.hash(password, salt);
+            userList.put(username, new User(username, hash, salt));
+            System.out.println("> DEBUG: REGISTER USER: USER CREATED");
         }
+        /**END SYNCHRONIZED BLOCK */
+
         return 1;
     }
+
+
 }

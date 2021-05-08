@@ -14,7 +14,7 @@ import java.util.HashMap;
 
 public class MainClient {
 
-    private static final int SERVER_PORT = 6789;
+    private static final int SERVER_PORT = 6790;
     private static final String REGISTRY_NAME = "SIGN-UP-SERVER";
 
     private static final HashMap<Integer, String> SignupErrorMessages = new HashMap<Integer, String>(){
