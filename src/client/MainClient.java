@@ -22,11 +22,12 @@ public class MainClient {
         while(true){
             System.out.print("> ");
             switch (buf.readLine()){
-                case "help"  : client.printHelp(); break;
-                case "signup": client.signUp(); break;
-                case "login" : client.login(); break;
-                case "quit": System.exit(0);
-                default      : client.printHelp(); break;
+                case "help"   : client.printHelp(); break;
+                case "signup" : client.signUp(); break;
+                case "login"  : client.login(); break;
+                case "logout" : client.logout(); break;
+                case "quit"   : client.logout(); System.exit(0);
+                default       : client.printHelp(); break;
             }
         }
     }

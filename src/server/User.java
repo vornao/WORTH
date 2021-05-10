@@ -1,6 +1,9 @@
 package server;
 
+import java.net.SocketAddress;
+
 public class User {
+    private int sessionHash;
     private String username;
     private String password;
     private String salt;
@@ -29,5 +32,17 @@ public class User {
 
     public String getSalt(){ return this.salt; }
 
+    public boolean getStatus() { return this.online; }
+
+    public void setStatus(boolean status){ this.online = status; }
+
     public void setSalt(String salt) { this.salt = salt; }
+
+    public void setSessionPort(int s){
+        this.sessionHash = s;
+    }
+
+    public int getSessionPort(){
+        return this.sessionHash;
+    }
 }
