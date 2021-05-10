@@ -1,9 +1,7 @@
 ## University Project for Network lab course.  
 
----
-
-Code quality score: ![logo](https://www.code-inspector.com/project/22413/score/svg)  
-Code grade: ![grade](https://www.code-inspector.com/project/22413/status/svg)
+![logo](https://www.code-inspector.com/project/22413/score/svg)  
+![grade](https://www.code-inspector.com/project/22413/status/svg)
 
 ---
 
