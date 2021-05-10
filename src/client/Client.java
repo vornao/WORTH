@@ -272,7 +272,7 @@ public class Client {
 
     /** logout and quit client */
     public void quit(){
-        logout();
+        if(loginName != null) logout();
         System.exit(0);
     }
 
