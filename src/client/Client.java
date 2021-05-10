@@ -114,7 +114,6 @@ public class Client {
         System.out.println("+------------------------------------------+");
     }
 
-
     /**
      * Log in method. First checks if user is logged in
      * if already logged in, prints red error message;
@@ -263,10 +262,8 @@ public class Client {
         System.out.format("| Username        | Status      |%n");
         System.out.format("+-----------------+-------------+%n");
 
-        Iterator<Map.Entry<String, Boolean>> iterator = worthUsers.entrySet().iterator();
-        while(iterator.hasNext()){
-            Map.Entry<String,Boolean> entry = iterator.next();
-            if(entry.getValue()) status = online;
+        for (Map.Entry<String, Boolean> entry : worthUsers.entrySet()) {
+            if (entry.getValue()) status = online;
             else status = "offline";
             System.out.format(rowFormat, entry.getKey(), status);
         }
