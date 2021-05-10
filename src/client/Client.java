@@ -1,7 +1,8 @@
 package client;
 
 import com.google.gson.*;
-import interfaces.RemoteSignUpInterface;
+import interfaces.RMIClientInterface;
+import interfaces.RMIServerInterface;
 import utils.TermColors;
 
 import java.io.*;
@@ -10,8 +11,10 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.rmi.NotBoundException;
+import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
+import java.rmi.server.UnicastRemoteObject;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -22,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 //export CLASSPATH=$CLASSPATH:/Users/vornao/Developer/university/WORTH/lib/gson-2.8.6.jar
 
 public class Client {
+    //todo parse command line arguments
     private final int RMI_SERVER_PORT;
     private final int PORT;
     private final String REGISTRY_NAME = "SIGN-UP-SERVER";
@@ -29,10 +33,12 @@ public class Client {
 
     private final SocketChannel socketChannel;
     private final ByteBuffer buffer;
-    private final String chatAddress = null;
-
-    private final ConcurrentHashMap<String, Boolean> worthUsers;
+    private final ConcurrentHashMap<String, Boolean> worthUsers = new ConcurrentHashMap<>();
     private String loginName = null;
+
+    private final RMIClient callbackAgent;
+    Registry registry;
+    RMIServerInterface remote;
 
     Gson gson = new Gson();
 
@@ -45,18 +51,24 @@ public class Client {
         }
     };
 
-    public Client(String address, int port, int rmiport) throws IOException {
+    public Client(String address, int port, int rmiport) throws IOException, NotBoundException {
         this.ADDRESS = address;
         this.RMI_SERVER_PORT = rmiport;
         this.PORT = port;
-        worthUsers = new ConcurrentHashMap<>();
+
+        registry = LocateRegistry.getRegistry("localhost", RMI_SERVER_PORT);
+        remote = (RMIServerInterface) registry.lookup(REGISTRY_NAME);
+        callbackAgent = new RMIClient(worthUsers);
+
         socketChannel = SocketChannel.open();
+
         try {
             socketChannel.connect(new InetSocketAddress(ADDRESS, PORT));
         } catch (IOException e) {
             System.out.println(TermColors.ANSI_RED + "ERROR: Failed to connect to server." + TermColors.ANSI_RESET);
             System.exit(-1);
         }
+
         buffer = ByteBuffer.wrap(new byte[8192]);
         buffer.clear();
     }
@@ -72,8 +84,6 @@ public class Client {
         BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
 
         try {
-            Registry registry = LocateRegistry.getRegistry("localhost", RMI_SERVER_PORT);
-            RemoteSignUpInterface remote = (RemoteSignUpInterface) registry.lookup(REGISTRY_NAME);
             System.out.print("> Insert new username: ");
             username = input.readLine();
             System.out.print("> Insert password: ");
@@ -87,7 +97,7 @@ public class Client {
             int status = remote.signUp(username, password);
             print(SignupErrorMessages.get(status), "yellow");
 
-        } catch (NotBoundException | IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
@@ -111,7 +121,6 @@ public class Client {
      * else will send a login json-formatted message to server, and waits for response
      * finally parses response to local object and displays response to user.
      * If something else goes wrong IOException or JSON format exception is catched and mesasge is displayed
-     * TODO: subscribe from rmi callback for user update.
      */
 
     public void login() {
@@ -178,12 +187,13 @@ public class Client {
 
             for (JsonElement j : userlist) {
                 JsonObject user = (JsonObject) j;
-                worthUsers.put(user.get("username").getAsString(), user.get("status").getAsBoolean());
+                worthUsers.put(user.get("username").getAsString(), (user.get("status").getAsBoolean()));
             }
         } catch (IOException | JsonIOException e) {
             e.printStackTrace();
             print("< ERROR: Error sending message to server", "red");
         }
+        registerForCallback();
     }
 
     /**
@@ -193,7 +203,6 @@ public class Client {
      * else will send a logout json-formatted message to server, and wait for response
      * finally displays response to user.
      * If something else goes wrong IOException or JSON format exception is catched and mesasge is displayed
-     * TODO: unsubscribe from rmi callback for user update.
      */
 
     public void logout() {
@@ -225,11 +234,13 @@ public class Client {
             }
 
             loginName = null;
+            remote.unregisterForCallback(callbackAgent);
 
         } catch (IOException | JsonIOException e) {
             print("< Error sending message to server", "red");
             e.printStackTrace();
         }
+
     }
 
     /**
@@ -258,7 +269,6 @@ public class Client {
             if(entry.getValue()) status = online;
             else status = "offline";
             System.out.format(rowFormat, entry.getKey(), status);
-            iterator.remove();
         }
         System.out.format("+-----------------+-------------+%n");
     }
@@ -273,4 +283,16 @@ public class Client {
     private void print(String message, String color){
         System.out.println(TermColors.Colors.get(color) + message + TermColors.Colors.get("reset"));
     }
+
+    private void registerForCallback(){
+        try {
+            RMIClientInterface stub = (RMIClientInterface) UnicastRemoteObject.exportObject(callbackAgent, 0);
+            remote.registerForCallback(stub);
+
+        }catch (RemoteException e){
+            e.printStackTrace();
+            print("> ERROR: (RMI) cannot subscribe to server callback", "red");
+        }
+    }
+
 }

@@ -3,10 +3,11 @@ package client;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.rmi.NotBoundException;
 
 public class MainClient {
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, NotBoundException {
         Client client = new Client("localhost", 6789, 6790);
 
         System.out.println( "--- Welcome to WORTH CLI client! ---\n");

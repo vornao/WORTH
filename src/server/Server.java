@@ -1,11 +1,10 @@
 package server;
 
 import com.google.gson.*;
-import interfaces.RemoteSignUpInterface;
+import interfaces.RMIServerInterface;
 import utils.PasswordHandler;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -24,6 +23,7 @@ public class Server {
     private final int SOCKETPORT;
     private final int RMIPORT;
     private final String ADDRESS;
+    private RMIServer rmiServer = null;
     private static final String REGISTRY_NAME =  "SIGN-UP-SERVER";
 
     private final ConcurrentHashMap<String, User> registeredUsers = new ConcurrentHashMap<>();
@@ -74,8 +74,8 @@ public class Server {
 
     private void startRMI(){
         try {
-            RemoteSignUp remoteSignUpServer = new RemoteSignUp(registeredUsers);
-            RemoteSignUpInterface stub = (RemoteSignUpInterface) UnicastRemoteObject.exportObject(remoteSignUpServer, RMIPORT);
+            rmiServer = new RMIServer(registeredUsers);
+            RMIServerInterface stub = (RMIServerInterface) UnicastRemoteObject.exportObject(rmiServer, RMIPORT);
             LocateRegistry.createRegistry(RMIPORT);
             //todo try to bind to non-localhost address!
             Registry registry = LocateRegistry.getRegistry(ADDRESS, RMIPORT);
@@ -179,6 +179,8 @@ public class Server {
         //auth ok
         registeredUsers.get(username).setStatus(true);    //set user state to online
         registeredUsers.get(username).setSessionPort(socketHash);
+        rmiServer.updateUsers(username, true);
+
         response.addProperty("return-code", 200); //send 200 OK code
 
         //fetch registered user and send status.
@@ -202,7 +204,9 @@ public class Server {
         }
         registeredUsers.get(username).setStatus(false);
         registeredUsers.get(username).setSessionPort(-1);
+        rmiServer.updateUsers(username, false);
         response.addProperty("return-code", 200);
         return response;
     }
+
 }
