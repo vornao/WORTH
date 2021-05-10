@@ -26,8 +26,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class Client {
     //todo parse command line arguments
-    private final int RMI_SERVER_PORT;
-    private final int PORT;
+    private final int    RMI_SERVER_PORT;
+    private final int    PORT;
     private final String REGISTRY_NAME = "SIGN-UP-SERVER";
     private final String ADDRESS;
 
