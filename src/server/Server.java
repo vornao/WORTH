@@ -49,7 +49,7 @@ public class Server {
     }
 
     public void start(){
-        System.out.println("--- Welcome to WORTH server (Progetto Reti Laboratorio a.a. 2020/20201) ---");
+        System.out.println("---- Welcome to WORTH server (Progetto Reti Laboratorio a.a. 2020/20201) ----");
         startRMI();
 
         while(true){
