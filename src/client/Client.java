@@ -276,7 +276,7 @@ public class Client {
         System.out.format("+-----------------+%n");
     }
 
-    public void listUsers(){
+    public void listUsers(Boolean onlyOnlineUsers){
 
         if(loginName == null) {
             print("> ERROR: You must log in to see registered users.", "red");
@@ -294,34 +294,13 @@ public class Client {
         for (Map.Entry<String, Boolean> entry : worthUsers.entrySet()) {
             if (entry.getValue()) status = online;
             else status = "offline";
-            System.out.format(rowFormat, entry.getKey(), status);
+            if(onlyOnlineUsers) {
+                if (status.equals(online)) System.out.format(rowFormat, entry.getKey(), status);
+
+            }else System.out.format(rowFormat, entry.getKey(), status);
+
         }
         System.out.format("+-----------------+-------------+%n");
-    }
-
-    public void listOnlineUsers(){
-
-        if(loginName == null) {
-            print("> ERROR: You must log in to see registered users.", "red");
-            return;
-        }
-
-        //green online string, offline label will be printed with default terminal color.
-        String online = Const.ANSI_GREEN + "online     " + Const.ANSI_RESET;
-        String status;
-        String rowFormat = "| %-15s | %-11s |%n";
-        System.out.format("+-----------------+-------------+%n");
-        System.out.format("| Username        | Status      |%n");
-        System.out.format("+-----------------+-------------+%n");
-
-        for (Map.Entry<String, Boolean> entry : worthUsers.entrySet()) {
-            if (entry.getValue()) {
-                status = online;
-                System.out.format(rowFormat, entry.getKey(), status);
-            }
-        }
-        System.out.format("+-----------------+-------------+%n");
-
     }
 
     /** logout and quit client */
