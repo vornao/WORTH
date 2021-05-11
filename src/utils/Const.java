@@ -2,7 +2,7 @@ package utils;
 
 import java.util.HashMap;
 
-public class TermColors {
+public class Const {
     public static final String ANSI_RESET = "\u001B[0m";
     public static final String ANSI_BLACK = "\u001B[30m";
     public static final String ANSI_RED = "\u001B[31m";
@@ -26,4 +26,9 @@ public class TermColors {
             put("white", ANSI_WHITE);
         }
     };
+
+    public static final String TODO = "todo";
+    public static final String INPROGRESS = "inprogress";
+    public static final String TOBEREVISED = "toberevised";
+    public static final String DONE = "done";
 }

@@ -2,6 +2,7 @@ package server;
 
 import com.google.gson.*;
 import interfaces.RMIServerInterface;
+import shared.Project;
 import utils.PasswordHandler;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -22,15 +23,15 @@ public class Server {
     private static final int CHANNEL_BUFFER_SIZE = 8192;
     private final int SOCKETPORT;
     private final int RMIPORT;
-    private final String ADDRESS;
     private RMIServer rmiServer = null;
+    private final String ADDRESS;
     private static final String REGISTRY_NAME =  "SIGN-UP-SERVER";
 
     private final ConcurrentHashMap<String, User> registeredUsers = new ConcurrentHashMap<>();
     private final List<Project> projects = Collections.synchronizedList(new ArrayList<>());
 
     private static Selector selector;
-    private static ServerSocketChannel serverSocketChannel;
+
 
     public Server(String address, int channelport, int rmiport){
         this.SOCKETPORT = channelport;
@@ -138,16 +139,27 @@ public class Server {
 
         //fetching requested method and computing response
         assert request != null;
-        switch (request.get("method").getAsString()){
-            case "login":
-                response = login(request.get("username").getAsString(),
-                        request.get("password").getAsString(),
-                        socketChannel.getRemoteAddress().hashCode());
-                break;
-            case "logout":
-                response = logout(request.get("username").getAsString());
-                break;
-            default: break;
+        try {
+            switch (request.get("method").getAsString()) {
+                case "login":
+                    response = login(request.get("username").getAsString(),
+                            request.get("password").getAsString(),
+                            socketChannel.getRemoteAddress().hashCode());
+                    break;
+                case "logout":
+                    response = logout(request.get("username").getAsString());
+                    break;
+                case "create-project":
+                    response = addProject(request.get("projectname").getAsString(), request.get("username").getAsString());
+                    break;
+                case "list-projects":
+                    response = listProjects(request.get("username").getAsString());
+                    break;
+                default:
+                    break;
+            }
+        }catch (Exception e){
+            e.printStackTrace();
         }
 
         assert response != null;
@@ -209,4 +221,39 @@ public class Server {
         return response;
     }
 
+    private JsonObject addProject(String projectname, String username){
+        JsonObject response = new JsonObject();
+        User u = registeredUsers.get(username);
+
+        if(!isLoggedIn(username)) {
+            response.addProperty("return-code", 401);
+            return response;
+        }
+        projects.add(new Project(projectname, u, null));
+
+        response.addProperty("return-code", 201);
+        return response;
+    }
+
+    private JsonObject listProjects(String username) {
+        JsonObject response = new JsonObject();
+
+        if (!isLoggedIn(username)) {
+            response.addProperty("return-code", 401);
+            return response;
+        }
+
+        JsonArray jsonArray = new JsonArray();
+        for (Project p : projects) {
+            if (p.isMember(username)) jsonArray.add(p.getName());
+        }
+
+        response.add("projects", jsonArray);
+        return response;
+    }
+
+    private boolean isLoggedIn(String username){
+        User u = registeredUsers.get(username);
+        return u != null && u.getStatus();
+    }
 }

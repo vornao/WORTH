@@ -21,6 +21,10 @@ public class MainClient {
                 case "login"      : client.login();     break;
                 case "logout"     : client.logout();    break;
                 case "list-users" : client.listUsers(); break;
+                case "list-projects" : client.listProjects(); break;
+                case "add-project": client.createProject(); break;
+                case "list-online": client.listOnlineUsers(); break;
+                case "clear"      : client.clear();     break;
                 case "quit"       : client.quit();      break;
                 default           : System.out.println("< Unknown command - type help for command list."); break;
             }

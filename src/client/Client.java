@@ -3,7 +3,7 @@ package client;
 import com.google.gson.*;
 import interfaces.RMIClientInterface;
 import interfaces.RMIServerInterface;
-import utils.TermColors;
+import utils.Const;
 
 import java.io.*;
 import java.net.InetSocketAddress;
@@ -16,7 +16,6 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -36,7 +35,7 @@ public class Client {
     private final ConcurrentHashMap<String, Boolean> worthUsers = new ConcurrentHashMap<>();
     private String loginName = null;
 
-    private final RMIClient callbackAgent;
+    private RMIClient callbackAgent;
     Registry registry;
     RMIServerInterface remote;
 
@@ -58,14 +57,13 @@ public class Client {
 
         registry = LocateRegistry.getRegistry("localhost", RMI_SERVER_PORT);
         remote = (RMIServerInterface) registry.lookup(REGISTRY_NAME);
-        callbackAgent = new RMIClient(worthUsers);
 
         socketChannel = SocketChannel.open();
 
         try {
             socketChannel.connect(new InetSocketAddress(ADDRESS, PORT));
         } catch (IOException e) {
-            System.out.println(TermColors.ANSI_RED + "ERROR: Failed to connect to server." + TermColors.ANSI_RESET);
+            System.out.println(Const.ANSI_RED + "ERROR: Failed to connect to server." + Const.ANSI_RESET);
             System.exit(-1);
         }
 
@@ -104,14 +102,15 @@ public class Client {
 
     /** display help message */
     public void printHelp() {
-        System.out.println("+--------------- Help Dialog --------------+");
-        System.out.println("|    login       - log in to service       |");
-        System.out.println("|    logout      - log out from service    |");
-        System.out.println("|    signup      - register user utility   |");
-        System.out.println("|    listUsers   - list registered users   |");
-        System.out.println("|    help        - show this message       |");
-        System.out.println("|    quit        - logout and exit         |");
-        System.out.println("+------------------------------------------+");
+        System.out.println("+---------------- Help Dialog --------------+");
+        System.out.println("|    login        - log in to service       |");
+        System.out.println("|    logout       - log out from service    |");
+        System.out.println("|    signup       - register user utility   |");
+        System.out.println("|    list-users   - list registered users   |");
+        System.out.println("|    list-online  - list registered users   |");
+        System.out.println("|    help         - show this message       |");
+        System.out.println("|    quit         - logout and exit         |");
+        System.out.println("+-------------------------------------------+");
     }
 
     /**
@@ -147,21 +146,11 @@ public class Client {
             //System.out.println("> DEBUG: " + loginJson);
 
             //write login request to server
-            buffer.put(loginJson.toString().getBytes());
-            buffer.flip();
-            while (buffer.hasRemaining()) socketChannel.write(buffer);
-            buffer.clear();
+            writeSocket(loginJson.toString().getBytes());
 
             //wait for response, check if read is successful
-            if(socketChannel.read(buffer) < 0){
-                print("< ERROR: Server closed connection unexpectedly.", "red");
-                System.exit(-1);
-            }
+            String responseString = readSocket();
 
-            buffer.flip();
-            String responseString;
-            responseString = StandardCharsets.UTF_8.decode(buffer).toString();
-            buffer.clear();
 
             //System.out.println(buffer);
             //System.out.println("> DEBUG: RECEIVED: " + responseString);
@@ -216,17 +205,11 @@ public class Client {
         request.addProperty("username", loginName);
 
         try {
-            buffer.clear();
-            buffer.put(request.toString().getBytes());
-            buffer.flip();
-            while (buffer.hasRemaining()) socketChannel.write(buffer);
-            buffer.clear();
+            writeSocket(request.toString().getBytes());
 
             //read response from server
-            socketChannel.read(buffer);
-            buffer.flip();
-            JsonObject response = gson.fromJson(StandardCharsets.UTF_8.decode(buffer).toString(), JsonObject.class);
-            buffer.clear();
+            String responseString = readSocket();
+            JsonObject response = gson.fromJson(responseString, JsonObject.class);
 
             if (!response.get("return-code").getAsString().equals("200")) {
                 print("< ERROR: Error logging out!", "red");
@@ -247,6 +230,52 @@ public class Client {
      *  if user is not logged in prints red error message and returns.
      */
 
+    public void createProject() throws IOException {
+        if(loginName == null){
+            print("< ERROR: you must log in before adding new project", "red");
+            return;
+        }
+
+        BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
+        String name;
+        System.out.print("> Insert new project name: ");
+        name = input.readLine();
+        JsonObject request = new JsonObject();
+        request.addProperty("username", loginName);
+        request.addProperty("method", "create-project");
+        request.addProperty("projectname", name);
+
+        writeSocket(request.toString().getBytes());
+        print(readSocket(), "yellow");
+    }
+
+    public void listProjects(){
+        if(loginName == null){
+            print("< ERROR: you must log in before adding new project", "red");
+            return;
+        }
+
+        JsonObject request = new JsonObject();
+        request.addProperty("username", loginName);
+        request.addProperty("method", "list-projects");
+
+        writeSocket(request.toString().getBytes());
+        String response = readSocket();
+
+        JsonArray projects = gson.fromJson(response, JsonObject.class).get("projects").getAsJsonArray();
+
+        String rowFormat = "| %-15s |%n";
+        System.out.format("+-----------------+%n");
+        System.out.format("| Projects        |%n");
+        System.out.format("+-----------------+%n");
+
+        for(JsonElement e : projects){
+            System.out.format(rowFormat, e.getAsString());
+        }
+
+        System.out.format("+-----------------+%n");
+    }
+
     public void listUsers(){
 
         if(loginName == null) {
@@ -255,7 +284,7 @@ public class Client {
         }
 
         //green online string, offline label will be printed with default terminal color.
-        String online = TermColors.ANSI_GREEN + "online     " + TermColors.ANSI_RESET;
+        String online = Const.ANSI_GREEN + "online     " + Const.ANSI_RESET;
         String status;
         String rowFormat = "| %-15s | %-11s |%n";
         System.out.format("+-----------------+-------------+%n");
@@ -270,18 +299,80 @@ public class Client {
         System.out.format("+-----------------+-------------+%n");
     }
 
+    public void listOnlineUsers(){
+
+        if(loginName == null) {
+            print("> ERROR: You must log in to see registered users.", "red");
+            return;
+        }
+
+        //green online string, offline label will be printed with default terminal color.
+        String online = Const.ANSI_GREEN + "online     " + Const.ANSI_RESET;
+        String status;
+        String rowFormat = "| %-15s | %-11s |%n";
+        System.out.format("+-----------------+-------------+%n");
+        System.out.format("| Username        | Status      |%n");
+        System.out.format("+-----------------+-------------+%n");
+
+        for (Map.Entry<String, Boolean> entry : worthUsers.entrySet()) {
+            if (entry.getValue()) {
+                status = online;
+                System.out.format(rowFormat, entry.getKey(), status);
+            }
+        }
+        System.out.format("+-----------------+-------------+%n");
+
+    }
+
     /** logout and quit client */
     public void quit(){
         if(loginName != null) logout();
         System.exit(0);
     }
 
+    public void clear(){
+        System.out.println("\033[H\033[2J");
+        System.out.flush();
+    }
+
+    private void writeSocket(byte[] request){
+        try {
+            buffer.clear();
+            buffer.put(request);
+            buffer.flip();
+            while (buffer.hasRemaining()) socketChannel.write(buffer);
+            buffer.clear();
+        }catch(IOException e){
+            print("< Failed sending message to server. Try Again",  "red");
+        }
+    }
+
+    private String readSocket(){
+        try {
+            if (socketChannel.read(buffer) < 0) {
+                print("< ERROR: Server closed connection unexpectedly.", "red");
+                System.exit(-1);
+            }
+            buffer.flip();
+            String responseString;
+            responseString = StandardCharsets.UTF_8.decode(buffer).toString();
+            buffer.clear();
+            return responseString;
+
+        }catch(IOException e){
+            print("< ERROR: Server closed connection unexpectedly.", "red");
+        }
+        return null;
+    }
+
     /** utility to print fancy ANSI terminal colors. */
     private void print(String message, String color){
-        System.out.println(TermColors.Colors.get(color) + message + TermColors.Colors.get("reset"));
+        System.out.println(Const.Colors.get(color) + message + Const.Colors.get("reset"));
     }
 
     private void registerForCallback(){
+        callbackAgent = new RMIClient(worthUsers);
+
         try {
             RMIClientInterface stub = (RMIClientInterface) UnicastRemoteObject.exportObject(callbackAgent, 0);
             remote.registerForCallback(stub);
