@@ -124,15 +124,19 @@ public class Project {
     }
 
     public HashMap<String, Card> getInProgressList(){
-        return todo;
+        return inProgress;
     }
 
     public HashMap<String, Card> getToBeRevisedList(){
-        return todo;
+        return toBeRevised;
     }
 
     public HashMap<String, Card> getDoneList(){
-        return todo;
+        return done;
+    }
+
+    public boolean isAllDone(){
+        return (todo.isEmpty() && inProgress.isEmpty()) && toBeRevised.isEmpty();
     }
 
     public String getName(){

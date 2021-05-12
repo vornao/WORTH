@@ -16,7 +16,8 @@ public class Card {
         this.cardHistory = new ArrayList<>();
         this.name = name;
         this.description = desc;
-        this.status = Const.TODO;
+        setStatus(Const.TODO);
+
     }
 
 
@@ -27,7 +28,11 @@ public class Card {
     public String getStatus(){ return status; }
 
     public void setStatus(String status){
-        addEvent(new CardEvent(new Date().getTime()/1000, this.status, status));
+        //card is created
+        String prevStatus;
+        if(this.status == null) prevStatus = "(created)";
+        else prevStatus = this.status;
+        addEvent(new CardEvent(new Date().getTime()/1000, prevStatus, status));
         this.status = status;
     }
 

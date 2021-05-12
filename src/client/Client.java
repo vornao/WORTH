@@ -15,6 +15,8 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
+import java.text.ParseException;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -53,10 +55,11 @@ public class Client {
 
     private static final HashMap<String, String> returnCodes = new HashMap<String, String>() {
         {
-            put("200", Const.ANSI_GREEN +"> OK - 200 - User created successfully" + Const.ANSI_RESET);
+            put("200", Const.ANSI_GREEN +"> OK - 200 - Done" + Const.ANSI_RESET);
             put("201", Const.ANSI_GREEN + "> OK - 201 - Resource Created" + Const.ANSI_RESET);
             put("404", Const.ANSI_RED+ "> ERROR: 404 - Resource not found" + Const.ANSI_RESET);
             put("401", Const.ANSI_RED+ "> ERROR: 401 - Unauthorized" + Const.ANSI_RESET);
+            put("403", Const.ANSI_RED+ "> ERROR: 403 - Forbidden" + Const.ANSI_RESET);
             put("409", Const.ANSI_RED+ "> ERROR: 409 - Resource already exists" + Const.ANSI_RESET);
         }
     };
@@ -100,11 +103,12 @@ public class Client {
             System.out.print("> Confirm password: ");
 
             if (!password.equals(input.readLine())) {
-                print("< ERROR:Password not matching! Retry", "red");
+                println("< ERROR:Password not matching! Retry", "red");
+                return;
             }
 
             int status = remote.signUp(username, password);
-            print(SignupErrorMessages.get(status), "yellow");
+            println(SignupErrorMessages.get(status), "yellow");
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -137,7 +141,7 @@ public class Client {
         String password;
 
         if(loginName != null){
-            print("< ERROR: You are already logged in as: " + loginName, "red");
+            println("< ERROR: You are already logged in as: " + loginName, "red");
             return;
         }
         //read user input from keyboard
@@ -174,10 +178,10 @@ public class Client {
 
             //check if login was successful and notify user.
             if (response.get("return-code").getAsString().equals("200")) {
-                print("< Login Successful!", "green");
+                println("< Login Successful!", "green");
                 this.loginName = username; //associating current login name to session for future requests
             } else {
-                print("< Login failed: " + response.get("return-code").getAsString(), "red");
+                println("< Login failed: " + response.get("return-code").getAsString(), "red");
                 return;
             }
 
@@ -190,7 +194,7 @@ public class Client {
             }
         } catch (IOException | JsonIOException e) {
             e.printStackTrace();
-            print("< ERROR: Error sending message to server", "red");
+            println("< ERROR: Error sending message to server", "red");
         }
         registerForCallback();
     }
@@ -207,7 +211,7 @@ public class Client {
     public void logout() {
 
         if (loginName == null) {
-            print("< ERROR: Log you in before logging out!", "red");
+            println("< ERROR: Log you in before logging out!", "red");
             return;
         }
 
@@ -223,14 +227,14 @@ public class Client {
             JsonObject response = gson.fromJson(responseString, JsonObject.class);
 
             if (!response.get("return-code").getAsString().equals("200")) {
-                print("< ERROR: Error logging out!", "red");
+                println("< ERROR: Error logging out!", "red");
             }
 
             loginName = null;
             remote.unregisterForCallback(callbackAgent);
 
         } catch (IOException | JsonIOException e) {
-            print("< Error sending message to server", "red");
+            println("< Error sending message to server", "red");
             e.printStackTrace();
         }
 
@@ -243,7 +247,7 @@ public class Client {
 
     public void createProject() throws IOException {
         if(loginName == null){
-            print("< ERROR: you must log in before adding new project", "red");
+            println("< ERROR: you must log in before adding new project", "red");
             return;
         }
 
@@ -264,7 +268,7 @@ public class Client {
 
     public void listProjects(){
         if(loginName == null){
-            print("< ERROR: you must log in before adding new project", "red");
+            println("< ERROR: you must log in before adding new project", "red");
             return;
         }
 
@@ -292,7 +296,7 @@ public class Client {
     public void listUsers(Boolean onlyOnlineUsers){
 
         if(loginName == null) {
-            print("> ERROR: You must log in to see registered users.", "red");
+            println("> ERROR: You must log in to see registered users.", "red");
             return;
         }
 
@@ -318,7 +322,7 @@ public class Client {
 
     public void showMembers() throws IOException {
         if(loginName == null){
-            print("< ERROR: you must log in before adding new users", "red");
+            println("< ERROR: you must log in before adding new users", "red");
             return;
         }
         BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
@@ -356,7 +360,7 @@ public class Client {
 
     public void addMember() throws IOException {
         if(loginName == null){
-            print("< ERROR: you must log in before adding new users", "red");
+            println("< ERROR: you must log in before adding new users", "red");
             return;
         }
         BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
@@ -380,7 +384,7 @@ public class Client {
 
     public void addCard() throws IOException {
         if(loginName == null){
-            print("< ERROR: you must log in before adding new users", "red");
+            println("< ERROR: you must log in before adding new users", "red");
             return;
         }
         BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
@@ -408,7 +412,7 @@ public class Client {
 
     public void showCard() throws IOException{
         if(loginName == null){
-            print("< ERROR: you must log in before adding new users", "red");
+            println("< ERROR: you must log in before adding new users", "red");
             return;
         }
         BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
@@ -432,15 +436,15 @@ public class Client {
 
         if(!returnCode.equals("200")) System.out.println(returnCodes.get(returnCode));
         else{
-            print("> Card Name: " + cardJson.get("name"), "yellow");
-            print("> Card Description: " + cardJson.get("description"), "yellow");
-            print("> Task Status: " + cardJson.get("currentlist"), "yellow");
+            println("> Card Name: " + cardJson.get("name"), "yellow");
+            println("> Card Description: " + cardJson.get("description"), "yellow");
+            println("> Task Status: " + cardJson.get("currentlist"), "yellow");
         }
     }
 
     public void listCards() throws IOException{
         if(loginName == null) {
-            print("> ERROR: You must log in to see registered users.", "red");
+            println("> ERROR: You must log in to see registered users.", "red");
             return;
         }
         BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
@@ -476,6 +480,92 @@ public class Client {
         System.out.format("+-----------------+-------------+%n");
     }
 
+    public void moveCard() throws IOException{
+        if(loginName == null){
+            println("< ERROR: you must log in before adding new users", "red");
+            return;
+        }
+        BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
+        String name;
+        String projectname;
+        String from;
+        String to;
+
+        System.out.print("> Insert project name: ");
+        projectname = input.readLine();
+        System.out.print("> Insert card name: ");
+        name = input.readLine();
+        System.out.print("> Insert start list: ");
+        from = input.readLine();
+        System.out.print("> Insert destination: ");
+        to = input.readLine();
+
+        JsonObject request = new JsonObject();
+        request.addProperty("method", "move-card");
+        request.addProperty("username", loginName);
+        request.addProperty("projectname", projectname);
+        request.addProperty("cardname", name);
+        request.addProperty("from", from);
+        request.addProperty("to", to);
+
+        writeSocket(request.toString().getBytes());
+        String returnCode = gson.fromJson(readSocket(), JsonObject.class).get("return-code").getAsString();
+        System.out.println(returnCodes.get(returnCode));
+    }
+
+    public void getCardHistory() throws IOException, ParseException {
+        if(loginName == null){
+            println("< ERROR: you must log in before adding new users", "red");
+            return;
+        }
+        BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
+        String name;
+        String projectname;
+        String from;
+        String to;
+
+        System.out.print("> Insert project name: ");
+        projectname = input.readLine();
+        System.out.print("> Insert card name: ");
+        name = input.readLine();
+
+
+        JsonObject request = new JsonObject();
+        request.addProperty("method", "get-card-history");
+        request.addProperty("username", loginName);
+        request.addProperty("projectname", projectname);
+        request.addProperty("cardname", name);
+
+        writeSocket(request.toString().getBytes());
+
+        JsonObject response = gson.fromJson(readSocket(), JsonObject.class);
+
+        if(!response.get("return-code").getAsString().equals("200")){
+            System.out.println(returnCodes.get(response.get("return-code").getAsString()));
+            return;
+        }
+
+
+        JsonArray history = response.getAsJsonArray("card-history");
+
+        String rowFormat = "| %-15s | %-11s | %-23s |%n";
+        System.out.format("+-----------------+-------------+-------------------------+%n");
+        System.out.format("| From            | To          | Date                    |%n");
+        System.out.format("+-----------------+-------------+-------------------------+%n");
+
+        for(JsonElement e : history){
+
+            int timestamp = e.getAsJsonObject().get("date").getAsInt();
+            String start = e.getAsJsonObject().get("from").getAsString();
+            String end = e.getAsJsonObject().get("to").getAsString();
+            String date = new java.text.SimpleDateFormat("MM-dd-yyyy HH:mm:ss")
+                    .format(new java.util.Date (timestamp* 1000L));
+            System.out.format(rowFormat, start, end, date);
+        }
+        System.out.format("+-----------------+-------------+-------------------------+%n");
+
+    }
+
     /** logout and quit client */
     public void quit(){
         if(loginName != null) logout();
@@ -487,6 +577,44 @@ public class Client {
         System.out.flush();
     }
 
+    public void deleteProject() throws IOException {
+        if(loginName == null){
+            println("< ERROR: you must log in before adding new users", "red");
+            return;
+        }
+        BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
+        String projectname;
+
+        System.out.print("> Insert project name: ");
+        projectname = input.readLine();
+
+        JsonObject request = new JsonObject();
+        request.addProperty("method", "delete-project");
+        request.addProperty("username", loginName);
+        request.addProperty("projectname", projectname);
+
+        print("> Are you sure you want to delete the project? This action cannot be undone [yes/no]: ", "red");
+        String ans;
+
+        while(true) {
+            ans = input.readLine();
+            if ("yes".equals(ans)) {
+                writeSocket(request.toString().getBytes());
+                break;
+            }
+            else if ("no".equals(ans)) {
+                println("< Operation cancelled.", "green");
+                return;
+            } else {
+                print("> Please type \"yes\" or \"no\": ", "red");
+            }
+        }
+
+        JsonObject response = gson.fromJson(readSocket(), JsonObject.class);
+        System.out.println(returnCodes.get(response.get("return-code").getAsString()));
+
+    }
+
     private void writeSocket(byte[] request){
         try {
             buffer.clear();
@@ -495,14 +623,14 @@ public class Client {
             while (buffer.hasRemaining()) socketChannel.write(buffer);
             buffer.clear();
         }catch(IOException e){
-            print("< Failed sending message to server. Try Again",  "red");
+            println("< Failed sending message to server. Try Again",  "red");
         }
     }
 
     private String readSocket(){
         try {
             if (socketChannel.read(buffer) < 0) {
-                print("< ERROR: Server closed connection unexpectedly.", "red");
+                println("< ERROR: Server closed connection unexpectedly.", "red");
                 System.exit(-1);
             }
             buffer.flip();
@@ -512,15 +640,19 @@ public class Client {
             return responseString;
 
         }catch(IOException e){
-            print("< ERROR: Server closed connection unexpectedly.", "red");
+            println("< ERROR: Server closed connection unexpectedly.", "red");
         }
         return null;
     }
 
     /** utility to print fancy ANSI terminal colors. */
-    private void print(String message, String color){
+    private void println(String message, String color){
         System.out.println(Const.Colors.get(color) + message + Const.Colors.get("reset"));
     }
+    private void print(String message, String color){
+        System.out.print(Const.Colors.get(color) + message + Const.Colors.get("reset"));
+    }
+
 
 
     private void registerForCallback(){
@@ -532,7 +664,7 @@ public class Client {
 
         }catch (RemoteException e){
             e.printStackTrace();
-            print("> ERROR: (RMI) cannot subscribe to server callback", "red");
+            println("> ERROR: (RMI) cannot subscribe to server callback", "red");
         }
     }
 

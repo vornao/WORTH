@@ -2,9 +2,11 @@ package server;
 
 import com.google.gson.*;
 import exceptions.CardAlreadyExistsException;
+import exceptions.CardMoveForbidden;
 import exceptions.CardNotFoundException;
 import interfaces.RMIServerInterface;
 import shared.Card;
+import shared.CardEvent;
 import shared.Project;
 import utils.PasswordHandler;
 import java.io.IOException;
@@ -67,7 +69,6 @@ public class Server {
                     keysIterator.remove();
                     if (sk.isAcceptable()) registerRead(selector, sk);
                     else if (sk.isReadable()) readSocketChannel(selector, sk);
-                    else if (sk.isWritable()) writeSocketChannel(selector, sk);
                 }
 
             }catch (IOException e){
@@ -172,18 +173,39 @@ public class Server {
                             request.get("projectname").getAsString());
                     break;
                 case "add-card":
-                    response = addCard(request.get("username").getAsString(),
+                    response = addCard(
+                            request.get("username").getAsString(),
                             request.get("cardname").getAsString(),
                             request.get("cardesc").getAsString(),
                             request.get("projectname").getAsString());
                     break;
                 case "show-card":
-                    response = showCard(request.get("username").getAsString(),
+                    response = showCard(
+                            request.get("username").getAsString(),
                             request.get("projectname").getAsString(),
                             request.get("cardname").getAsString());
                     break;
+                case "move-card":
+                    response = moveCard(
+                            request.get("username").getAsString(),
+                            request.get("cardname").getAsString(),
+                            request.get("from").getAsString(),
+                            request.get("to").getAsString(),
+                            request.get("projectname").getAsString());
+                    break;
                 case "list-cards":
                     response = listCards(
+                            request.get("username").getAsString(),
+                            request.get("projectname").getAsString());
+                    break;
+                case "get-card-history":
+                    response = getCardHistory(
+                            request.get("username").getAsString(),
+                            request.get("projectname").getAsString(),
+                            request.get("cardname").getAsString());
+                    break;
+                case "delete-project":
+                    response = deleteProject(
                             request.get("username").getAsString(),
                             request.get("projectname").getAsString());
                     break;
@@ -206,8 +228,7 @@ public class Server {
         socketChannel.register(selector, SelectionKey.OP_READ, buffer); //channel ready for new client requests.
     }
 
-    private void writeSocketChannel(Selector selector, SelectionKey selectionKey) throws IOException {
-    }
+    //todo write nice user permissions check
 
     private JsonObject login(String username, String password, int socketHash){
         JsonObject response = new JsonObject();
@@ -292,6 +313,27 @@ public class Server {
         return response;
     }
 
+    private JsonObject moveCard(String username, String cardname, String from, String to, String projectname){
+        //user is logged in, member and card exists in project.
+        JsonObject response = new JsonObject();
+        Project p = projects.get(projectname);
+
+        if(!isLoggedIn(username) || p == null || !p.isMember(username) ){
+            response.addProperty("return-code", 401);
+            return response;
+        }
+
+        try{
+            p.moveCard(cardname, from, to);
+        }catch (CardNotFoundException | CardMoveForbidden e){
+            response.addProperty("return-code", 405);
+            return response;
+        }
+
+        response.addProperty("return-code", 200);
+        return response;
+    }
+
     private JsonObject listCards(String username, String projectname){
         JsonObject response = new JsonObject();
         Project p = projects.get(projectname);
@@ -335,6 +377,35 @@ public class Server {
 
     }
 
+    private JsonObject getCardHistory(String username, String projectname, String cardname){
+        JsonObject response = new JsonObject();
+        Project p = projects.get(projectname);
+
+        if(!isLoggedIn(username) || p == null || !p.isMember(username) ){
+            response.addProperty("return-code", 401);
+            return response;
+        }
+
+        try{
+            JsonArray history =  new JsonArray();
+            ArrayList<CardEvent> cardHistory = p.getCard(cardname).getCardHistory();
+            for(CardEvent e : cardHistory){
+                JsonObject event = new JsonObject();
+                event.addProperty("date", e.getDate());
+                event.addProperty("from", e.getFrom());
+                event.addProperty("to",   e.getTo());
+                history.add(event);
+            }
+            response.add("card-history", history);
+            response.addProperty("return-code", 200);
+            return response;
+
+        }catch (CardNotFoundException e){
+            response.addProperty("return-code", 404);
+            return response;
+        }
+    }
+
     private JsonObject listProjects(String username) {
         JsonObject response = new JsonObject();
 
@@ -349,6 +420,25 @@ public class Server {
         }
 
         response.add("projects", jsonArray);
+        return response;
+    }
+
+    private JsonObject deleteProject(String username, String projectname){
+        JsonObject response = new JsonObject();
+        Project p = projects.get(projectname);
+
+        if(!isLoggedIn(username) || p == null || !p.isMember(username) ){
+            response.addProperty("return-code", 401);
+            return response;
+        }
+
+        if(!p.isAllDone()){
+            response.addProperty("return-code", 403);
+            return response;
+        }
+
+        projects.remove(p.getName(), p);
+        response.addProperty("return-code", 200);
         return response;
     }
 
