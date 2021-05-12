@@ -4,6 +4,7 @@ import utils.Const;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 
 public class Card {
     private final ArrayList<CardEvent> cardHistory;
@@ -25,9 +26,12 @@ public class Card {
 
     public String getStatus(){ return status; }
 
-    public void setStatus(String status){ this.status = status; }
+    public void setStatus(String status){
+        addEvent(new CardEvent(new Date().getTime()/1000, this.status, status));
+        this.status = status;
+    }
 
-    public void addEvent(CardEvent e){
+    private void addEvent(CardEvent e){
         cardHistory.add(e);
         Collections.sort(cardHistory);
     }

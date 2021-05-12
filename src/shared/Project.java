@@ -53,8 +53,8 @@ public class Project {
 
         try {
             Card temp = cardLists.get(from).remove(name);
-            temp.setStatus(to);
             cardLists.get(to).put(name, temp);
+            temp.setStatus(to);
         }
         catch(Exception e){
                 e.printStackTrace();
@@ -77,7 +77,7 @@ public class Project {
         return cardInfo;
     }
 
-    private Card getCard(String name) throws CardNotFoundException {
+    public Card getCard(String name) throws CardNotFoundException {
         if(todo.containsKey(name))          return todo.get(name);
         if(inProgress.containsKey(name))    return inProgress.get(name);
         if(toBeRevised.containsKey(name))   return toBeRevised.get(name);
@@ -96,8 +96,8 @@ public class Project {
         return true;
     }
 
-    public boolean addCard(String name, String desc){
-        if(cardExists(name)) return false;
+    public boolean addCard(String name, String desc) throws CardAlreadyExistsException {
+        if(cardExists(name)) throw new CardAlreadyExistsException();
         todo.put(name, new Card(name, desc));
         return true;
     }

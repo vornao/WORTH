@@ -3,17 +3,17 @@ package shared;
 import java.util.Date;
 
 public class CardEvent implements Comparable<CardEvent>{
-    private final Date date;
+    private final long date;
     private final String from;
     private final String to;
 
-    public CardEvent(Date date, String from, String to){
-        this.date = date;
+    public CardEvent(long timestamp, String from, String to){
+        this.date = timestamp;
         this.from = from;
         this.to = to;
     }
 
-    public Date getDate() {
+    public long getDate() {
         return date;
     }
 
@@ -27,6 +27,6 @@ public class CardEvent implements Comparable<CardEvent>{
 
     @Override
     public int compareTo(CardEvent o) {
-        return this.date.compareTo(o.getDate());
+        return (int)(this.date - o.getDate());
     }
 }

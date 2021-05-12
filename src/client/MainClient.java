@@ -23,6 +23,11 @@ public class MainClient {
                 case "list-users" : client.listUsers(false); break;
                 case "list-projects" : client.listProjects(); break;
                 case "add-project": client.createProject(); break;
+                case "add-member" : client.addMember(); break;
+                case "add-card"   : client.addCard(); break;
+                case "show-card"  : client.showCard(); break;
+                case "list-cards" :  client.listCards(); break;
+                case "list-members": client.showMembers(); break;
                 case "list-online": client.listUsers(true); break;
                 case "clear"      : client.clear();     break;
                 case "quit"       : client.quit();      break;

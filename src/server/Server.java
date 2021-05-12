@@ -1,7 +1,10 @@
 package server;
 
 import com.google.gson.*;
+import exceptions.CardAlreadyExistsException;
+import exceptions.CardNotFoundException;
 import interfaces.RMIServerInterface;
+import shared.Card;
 import shared.Project;
 import utils.PasswordHandler;
 import java.io.IOException;
@@ -28,7 +31,7 @@ public class Server {
     private static final String REGISTRY_NAME =  "SIGN-UP-SERVER";
 
     private final ConcurrentHashMap<String, User> registeredUsers = new ConcurrentHashMap<>();
-    private final List<Project> projects = Collections.synchronizedList(new ArrayList<>());
+    private final ConcurrentHashMap<String, Project> projects = new ConcurrentHashMap<>();
 
     private static Selector selector;
 
@@ -142,7 +145,8 @@ public class Server {
         try {
             switch (request.get("method").getAsString()) {
                 case "login":
-                    response = login(request.get("username").getAsString(),
+                    response = login(
+                            request.get("username").getAsString(),
                             request.get("password").getAsString(),
                             socketChannel.getRemoteAddress().hashCode());
                     break;
@@ -150,10 +154,38 @@ public class Server {
                     response = logout(request.get("username").getAsString());
                     break;
                 case "create-project":
-                    response = addProject(request.get("projectname").getAsString(), request.get("username").getAsString());
+                    response = addProject(
+                            request.get("projectname").getAsString(),
+                            request.get("username").getAsString());
                     break;
                 case "list-projects":
                     response = listProjects(request.get("username").getAsString());
+                    break;
+                case "add-member":
+                    response = addMember(request.get("username").getAsString(),
+                            request.get("new-member").getAsString(),
+                            request.get("projectname").getAsString());
+                    break;
+                case "show-members":
+                    response = showMembers(
+                            request.get("username").getAsString(),
+                            request.get("projectname").getAsString());
+                    break;
+                case "add-card":
+                    response = addCard(request.get("username").getAsString(),
+                            request.get("cardname").getAsString(),
+                            request.get("cardesc").getAsString(),
+                            request.get("projectname").getAsString());
+                    break;
+                case "show-card":
+                    response = showCard(request.get("username").getAsString(),
+                            request.get("projectname").getAsString(),
+                            request.get("cardname").getAsString());
+                    break;
+                case "list-cards":
+                    response = listCards(
+                            request.get("username").getAsString(),
+                            request.get("projectname").getAsString());
                     break;
                 default:
                     break;
@@ -229,10 +261,78 @@ public class Server {
             response.addProperty("return-code", 401);
             return response;
         }
-        projects.add(new Project(projectname, u, null));
+        if(projects.containsKey(projectname)){
+            response.addProperty("return-code", 409);
+            return response;
+        }
+        projects.put(projectname, new Project(projectname, u, null));
 
         response.addProperty("return-code", 201);
         return response;
+    }
+
+    private JsonObject addCard(String username, String cardname, String desc, String projectname){
+        JsonObject response = new JsonObject();
+        User u = registeredUsers.get(username);
+        Project p = projects.get(projectname);
+
+        if(u == null || !isLoggedIn(username) || p == null || !p.isMember(username)) {
+            response.addProperty("return-code", 401);
+            return response;
+        }
+
+        try {
+            p.addCard(new Card(cardname, desc));
+        }catch (CardAlreadyExistsException e){
+            response.addProperty("return-code", 409);
+            return response;
+        }
+
+        response.addProperty("return-code", 201);
+        return response;
+    }
+
+    private JsonObject listCards(String username, String projectname){
+        JsonObject response = new JsonObject();
+        Project p = projects.get(projectname);
+
+        //permissions checks
+        if(!isLoggedIn(username) || p == null || !p.isMember(username) ) {
+            response.addProperty("return-code", 401);
+            return response;
+        }
+
+        ArrayList<Card> cardList = p.getCards();
+        JsonArray cardsJson = new JsonArray();
+        for(Card c : cardList){
+            JsonObject json = new JsonObject();
+            json.addProperty("card-name", c.getName());
+            json.addProperty("card-state", c.getStatus());
+            cardsJson.add(json);
+        }
+
+        response.addProperty("return-code", 200);
+        response.add("card-list", cardsJson);
+        return response;
+    }
+
+    private JsonObject showCard(String username, String projectname, String cardname){
+        JsonObject response = new JsonObject();
+        Project p = projects.get(projectname);
+
+        //permissions checks
+        if(!isLoggedIn(username) || p == null || !p.isMember(username) ) {
+            response.addProperty("return-code", 401);
+            return response;
+        }
+        try {
+            response.addProperty("return-code", 200);
+            response.add("card-info", p.getCardJson(cardname));
+        }catch (CardNotFoundException e){
+            response.addProperty("return-code", 401);
+        }
+        return response;
+
     }
 
     private JsonObject listProjects(String username) {
@@ -244,7 +344,7 @@ public class Server {
         }
 
         JsonArray jsonArray = new JsonArray();
-        for (Project p : projects) {
+        for (Project p : projects.values()) {
             if (p.isMember(username)) jsonArray.add(p.getName());
         }
 
@@ -252,6 +352,72 @@ public class Server {
         return response;
     }
 
+    private JsonObject addMember(String username, String newMember, String projectname){
+        JsonObject response = new JsonObject();
+
+        //check if current user is logged in
+        if (!isLoggedIn(username)) {
+            response.addProperty("return-code", 401);
+            return response;
+        }
+
+        //check if new user is registered
+        User u = registeredUsers.get(newMember);
+        Project p = projects.get(projectname);
+        if(u == null || p == null){
+            response.addProperty("return-code", 404);
+            return response;
+        }
+
+        //check if current user is an actual member of the project
+        if(!p.isMember(username)){
+            response.addProperty("return-code", 401);
+            return response;
+        }
+
+        p.addMember(u);
+        response.addProperty("return-code", 201);
+        return response;
+    }
+
+    private JsonObject showMembers(String username, String projectname){
+        Project p = projects.get(projectname);
+        JsonObject response = new JsonObject();
+
+        //check if user is logged in and exists
+        if (!isLoggedIn(username)) {
+            response.addProperty("return-code", 401);
+            return response;
+        }
+
+        //check if project exists
+        if(p == null){
+            response.addProperty("return-code", 404);
+            return response;
+        }
+
+        //check if current user is an actual member of the project
+        if(!p.isMember(username)){
+            response.addProperty("return-code", 401);
+            return response;
+        }
+
+        JsonArray members = new JsonArray();
+        for(String s : p.getMembers().keySet()){
+            members.add(s);
+        }
+
+        response.addProperty("return-code", 200);
+        response.add("members", members);
+        return response;
+    }
+
+    /**
+     * Chechs whether user is online.
+     * @param username username associated to a particular user
+     * @return false if username not found or not logged in;
+     *         true if username found and logged in == true
+     */
     private boolean isLoggedIn(String username){
         User u = registeredUsers.get(username);
         return u != null && u.getStatus();

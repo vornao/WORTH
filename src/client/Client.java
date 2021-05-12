@@ -42,11 +42,22 @@ public class Client {
     Gson gson = new Gson();
 
     //todo server side return different codes
+    //todo create enum to convert server codes into fancy string
     private static final HashMap<Integer, String> SignupErrorMessages = new HashMap<Integer, String>() {
         {
             put(1, "> User created successfully");
             put(2, "> User creation failed, try again");
             put(0, "> Username already exists, try again");
+        }
+    };
+
+    private static final HashMap<String, String> returnCodes = new HashMap<String, String>() {
+        {
+            put("200", Const.ANSI_GREEN +"> OK - 200 - User created successfully" + Const.ANSI_RESET);
+            put("201", Const.ANSI_GREEN + "> OK - 201 - Resource Created" + Const.ANSI_RESET);
+            put("404", Const.ANSI_RED+ "> ERROR: 404 - Resource not found" + Const.ANSI_RESET);
+            put("401", Const.ANSI_RED+ "> ERROR: 401 - Unauthorized" + Const.ANSI_RESET);
+            put("409", Const.ANSI_RED+ "> ERROR: 409 - Resource already exists" + Const.ANSI_RESET);
         }
     };
 
@@ -246,7 +257,9 @@ public class Client {
         request.addProperty("projectname", name);
 
         writeSocket(request.toString().getBytes());
-        print(readSocket(), "yellow");
+
+        String returnCode = gson.fromJson(readSocket(), JsonObject.class).get("return-code").getAsString();
+        System.out.println(returnCodes.get(returnCode));
     }
 
     public void listProjects(){
@@ -303,6 +316,166 @@ public class Client {
         System.out.format("+-----------------+-------------+%n");
     }
 
+    public void showMembers() throws IOException {
+        if(loginName == null){
+            print("< ERROR: you must log in before adding new users", "red");
+            return;
+        }
+        BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
+        String projectname;
+        System.out.print("> Insert project name: ");
+        projectname = input.readLine();
+
+        JsonObject request = new JsonObject();
+        request.addProperty("username", loginName);
+        request.addProperty("method", "show-members");
+        request.addProperty("projectname", projectname);
+
+        writeSocket(request.toString().getBytes());
+        JsonObject response = gson.fromJson(readSocket(), JsonObject.class);
+
+        String returnCode = response.get("return-code").getAsString();
+        if(!returnCode.equals("200")){
+            System.out.println(returnCodes.get(returnCode));
+            return;
+        }
+
+        JsonArray projects = response.get("members").getAsJsonArray();
+        String rowFormat = "| %-15s |%n";
+        System.out.format("+-----------------+%n");
+        System.out.format(rowFormat, projectname + " members");
+        System.out.format("+-----------------+%n");
+
+        for(JsonElement e : projects){
+            System.out.format(rowFormat, e.getAsString());
+        }
+
+        System.out.format("+-----------------+%n");
+
+    }
+
+    public void addMember() throws IOException {
+        if(loginName == null){
+            print("< ERROR: you must log in before adding new users", "red");
+            return;
+        }
+        BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
+        String name;
+        String projectname;
+        System.out.print("> Insert project name: ");
+        projectname = input.readLine();
+        System.out.print("> Insert new member username (user id): ");
+        name = input.readLine();
+        JsonObject request = new JsonObject();
+        request.addProperty("method", "add-member");
+        request.addProperty("username", loginName);
+        request.addProperty("projectname", projectname);
+        request.addProperty("new-member", name);
+        writeSocket(request.toString().getBytes());
+
+        String returnCode = gson.fromJson(readSocket(), JsonObject.class).get("return-code").getAsString();
+        System.out.println(returnCodes.get(returnCode));
+
+    }
+
+    public void addCard() throws IOException {
+        if(loginName == null){
+            print("< ERROR: you must log in before adding new users", "red");
+            return;
+        }
+        BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
+        String cardname;
+        String cardDescr;
+        String projectname;
+        System.out.print("> Insert project name: ");
+        projectname = input.readLine();
+        System.out.print("> Insert new card name: ");
+        cardname = input.readLine();
+        System.out.print("> Provide a description for new card: ");
+        cardDescr = input.readLine();
+
+        JsonObject request = new JsonObject();
+        request.addProperty("username", loginName);
+        request.addProperty("method", "add-card");
+        request.addProperty("projectname", projectname);
+        request.addProperty("cardname", cardname);
+        request.addProperty("cardesc", cardDescr);
+
+        writeSocket(request.toString().getBytes());
+        String returnCode = gson.fromJson(readSocket(), JsonObject.class).get("return-code").getAsString();
+        System.out.println(returnCodes.get(returnCode));
+    }
+
+    public void showCard() throws IOException{
+        if(loginName == null){
+            print("< ERROR: you must log in before adding new users", "red");
+            return;
+        }
+        BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
+        String name;
+        String projectname;
+        System.out.print("> Insert project name: ");
+        projectname = input.readLine();
+        System.out.print("> Insert card name: ");
+        name = input.readLine();
+
+        JsonObject request = new JsonObject();
+        request.addProperty("method", "show-card");
+        request.addProperty("username", loginName);
+        request.addProperty("projectname", projectname);
+        request.addProperty("cardname", name);
+
+        writeSocket(request.toString().getBytes());
+        JsonObject response = gson.fromJson(readSocket(), JsonObject.class);
+        JsonObject cardJson = response.getAsJsonObject("card-info");
+        String returnCode = response.get("return-code").getAsString();
+
+        if(!returnCode.equals("200")) System.out.println(returnCodes.get(returnCode));
+        else{
+            print("> Card Name: " + cardJson.get("name"), "yellow");
+            print("> Card Description: " + cardJson.get("description"), "yellow");
+            print("> Task Status: " + cardJson.get("currentlist"), "yellow");
+        }
+    }
+
+    public void listCards() throws IOException{
+        if(loginName == null) {
+            print("> ERROR: You must log in to see registered users.", "red");
+            return;
+        }
+        BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
+        String projectname;
+        System.out.print("> Insert project name: ");
+        projectname = input.readLine();
+        JsonObject request = new JsonObject();
+        request.addProperty("username", loginName);
+        request.addProperty("method", "list-cards");
+        request.addProperty("projectname", projectname);
+
+        writeSocket(request.toString().getBytes());
+        JsonObject response = gson.fromJson(readSocket(), JsonObject.class);
+        String statusCode = response.get("return-code").getAsString();
+
+        if(!statusCode.equals("200")){
+            System.out.println(returnCodes.get(statusCode));
+            return;
+        }
+
+        JsonArray cards = response.get("card-list").getAsJsonArray();
+
+        //green online string, offline label will be printed with default terminal color.
+        String rowFormat = "| %-15s | %-11s |%n";
+        System.out.format("+-----------------+-------------+%n");
+        System.out.format("| Card Name       | List        |%n");
+        System.out.format("+-----------------+-------------+%n");
+        for(JsonElement e : cards){
+            System.out.format(rowFormat,
+                    e.getAsJsonObject().get("card-name").getAsString(),
+                    e.getAsJsonObject().get("card-state").getAsString());
+        }
+        System.out.format("+-----------------+-------------+%n");
+    }
+
     /** logout and quit client */
     public void quit(){
         if(loginName != null) logout();
@@ -348,6 +521,7 @@ public class Client {
     private void print(String message, String color){
         System.out.println(Const.Colors.get(color) + message + Const.Colors.get("reset"));
     }
+
 
     private void registerForCallback(){
         callbackAgent = new RMIClient(worthUsers);
