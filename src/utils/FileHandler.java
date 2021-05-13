@@ -13,22 +13,20 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class FileHandler {
-    private final String basepath;
     private final String userspath;
     private final String projectpath;
 
-    private final File base;
     private final File users;
     private final File projects;
 
     private final Gson serializer = setGson();
 
     public FileHandler(String projectdir){
-        this.basepath = projectdir + "/worth";
+        String basepath = projectdir + "/worth";
         userspath = basepath + "/users";
         projectpath = basepath + "/projects";
 
-        base = new File(basepath);
+        File base = new File(basepath);
         users = new File(userspath);
         projects= new File(projectpath);
 
@@ -112,6 +110,7 @@ public class FileHandler {
     }
 
     public ConcurrentHashMap<String, Project> loadProjects(){
+
         ConcurrentHashMap<String, Project> projectsMap = new ConcurrentHashMap<>();
 
         if(projects == null || projects.list() == null){
@@ -145,8 +144,8 @@ public class FileHandler {
     }
 
     private ArrayList<Card> loadCards(String projectdir){
-        ArrayList<Card> cardlist = new ArrayList<>();
 
+        ArrayList<Card> cardlist = new ArrayList<>();
         File cards = new File(projectdir);
 
         try {
@@ -173,6 +172,8 @@ public class FileHandler {
         while((line = br.readLine()) != null){
             sb.append(line);
         }
+        br.close();
+        p.close();
         return sb.toString();
     }
 }
