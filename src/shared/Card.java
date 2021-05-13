@@ -20,6 +20,13 @@ public class Card {
 
     }
 
+    //constructor meant mainly for restoring card status.
+    public Card(String name, String desc, String status, ArrayList<CardEvent> history){
+        this.cardHistory = history;
+        this.name = name;
+        this.description = desc;
+        this.status = status;
+    }
 
     public String getName(){ return name; }
 

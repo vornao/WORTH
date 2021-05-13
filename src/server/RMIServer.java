@@ -3,8 +3,11 @@ package server;
 import client.RMIClient;
 import interfaces.RMIClientInterface;
 import interfaces.RMIServerInterface;
+import utils.FileHandler;
 import utils.PasswordHandler;
+import utils.Printer;
 
+import java.io.IOException;
 import java.rmi.RemoteException;
 import java.rmi.server.RemoteServer;
 import java.util.ArrayList;
@@ -14,8 +17,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RMIServer extends RemoteServer implements RMIServerInterface {
     private final ConcurrentHashMap<String, User> userList;
     private final List<RMIClientInterface> clients = new ArrayList<>();
-    public RMIServer(ConcurrentHashMap<String, User> userList){
+    private final FileHandler fh;
+    public RMIServer(ConcurrentHashMap<String, User> userList, String projectdir){
         this.userList = userList;
+        this.fh = new FileHandler(projectdir);
     }
 
     @Override
@@ -25,8 +30,11 @@ public class RMIServer extends RemoteServer implements RMIServerInterface {
             //todo add persistence
             String salt = PasswordHandler.salt();
             String hash = PasswordHandler.hash(password, salt);
-            userList.put(username, new User(username, hash, salt));
-            System.out.println("> DEBUG: REGISTER USER: USER CREATED");
+            User u = new User(username, hash, salt);
+            userList.put(username, u);
+            fh.saveUser(u);
+
+        Printer.println("> DEBUG: REGISTER USER: USER CREATED", "blue");
             updateUsers(username, false);
 
         return 1;
@@ -35,7 +43,7 @@ public class RMIServer extends RemoteServer implements RMIServerInterface {
     @Override
     public synchronized void registerForCallback(RMIClientInterface client) throws RemoteException {
         if(!clients.contains(client)){
-            System.out.println("CLIENT REGISTERED TO CALLBACK");
+            Printer.println("> INFO: CLIENT REGISTERED TO CALLBACK", "green");
             clients.add(client);
         }
     }
@@ -43,7 +51,7 @@ public class RMIServer extends RemoteServer implements RMIServerInterface {
     @Override
     public synchronized void unregisterForCallback(RMIClientInterface client) throws RemoteException{
         if(clients.remove(client)){
-            System.out.println("CLIENT UNREGISTERED FROM CALLBACK");
+            Printer.println("> INFO: CLIENT UNREGISTERED FROM CALLBACK", "green");
         }
     }
 
@@ -52,6 +60,8 @@ public class RMIServer extends RemoteServer implements RMIServerInterface {
             try {
                 client.notifyUser(username, status);
             } catch (RemoteException e) {
+                //client no longer available
+                clients.remove(client);
                 e.printStackTrace();
             }
         }

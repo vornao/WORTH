@@ -1,13 +1,17 @@
 package server;
 
+import com.google.gson.annotations.Expose;
+
 import java.net.SocketAddress;
 
 public class User {
+
     private int sessionHash;
     private String username;
     private String password;
     private String salt;
     private boolean online = false;
+
     public User(String username, String password, String salt){
         this.username =  username;
         this.password = password;

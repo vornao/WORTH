@@ -5,31 +5,34 @@ import exceptions.CardAlreadyExistsException;
 import exceptions.CardMoveForbidden;
 import exceptions.CardNotFoundException;
 import server.User;
-import shared.Card;
 import utils.Const;
-
+import utils.FileHandler;
 import java.util.ArrayList;
 import java.util.HashMap;
 
 public class Project {
+
     private final String name;
     private final String chatAddress;
+    private final FileHandler fileHandler;
+
     private final HashMap<String, HashMap<String, Card>> cardLists;
     private final HashMap<String, Card> todo;
     private final HashMap<String, Card> inProgress;
     private final HashMap<String, Card> toBeRevised;
     private final HashMap<String, Card> done;
-    private final HashMap<String, User> members;
+    private final ArrayList<String> members;
 
-    public Project(String projectname, User creator, String chatAddress){
+    public Project(String projectname, User creator, String chatAddress, String projectdir){
         //initialize private project lists
         this.chatAddress = chatAddress;
         this.name   = projectname;
+        fileHandler = new FileHandler(projectdir);
         todo        = new HashMap<>();
         inProgress  = new HashMap<>();
         toBeRevised = new HashMap<>();
         done        = new HashMap<>();
-        members     = new HashMap<>();
+        members     = new ArrayList<>();
         cardLists = new HashMap<String, HashMap<String, Card>>(){
             {
                 put(Const.TODO, todo);
@@ -38,11 +41,30 @@ public class Project {
                 put(Const.DONE, done);
             }
         };
-        members.put(creator.getUsername(), creator);
+        members.add(creator.getUsername());
     }
 
-    //todo create CardNotMovingException
-    public boolean moveCard(String name, String from, String to) throws CardMoveForbidden, CardNotFoundException {
+    public Project(String projectname, ArrayList<String> members, String chatAddress, String projectdir){
+        //initialize private project lists
+        this.chatAddress = chatAddress;
+        this.name   = projectname;
+        fileHandler = new FileHandler(projectdir);
+        todo        = new HashMap<>();
+        inProgress  = new HashMap<>();
+        toBeRevised = new HashMap<>();
+        done        = new HashMap<>();
+        cardLists = new HashMap<String, HashMap<String, Card>>(){
+            {
+                put(Const.TODO, todo);
+                put(Const.INPROGRESS, inProgress);
+                put(Const.TOBEREVISED, toBeRevised);
+                put(Const.DONE, done);
+            }
+        };
+        this.members = members;
+    }
+
+    public void moveCard(String name, String from, String to) throws CardMoveForbidden, CardNotFoundException {
         //card moves constraints check
         if(!cardExists(name))       throw new CardNotFoundException();
         if(from.equals(to))         throw new CardMoveForbidden("Card move not allowed.");
@@ -55,12 +77,11 @@ public class Project {
             Card temp = cardLists.get(from).remove(name);
             cardLists.get(to).put(name, temp);
             temp.setStatus(to);
+            fileHandler.saveCard(this.name, temp);
         }
         catch(Exception e){
                 e.printStackTrace();
-                return false;
         }
-        return true;
     }
 
     private boolean cardExists(String cardname){
@@ -87,19 +108,35 @@ public class Project {
     }
 
     public void addMember(User newMember){
-        members.putIfAbsent(newMember.getUsername(), newMember);
+        if (!members.contains(newMember.getUsername()))
+        members.add(newMember.getUsername());
     }
 
-    public boolean addCard(Card card) throws CardAlreadyExistsException {
+    public void addCard(Card card) throws CardAlreadyExistsException {
         if(cardExists(card.getName())) throw new CardAlreadyExistsException();
         todo.put(card.getName(), card);
-        return true;
+        fileHandler.saveCard(this.name, card);
     }
 
-    public boolean addCard(String name, String desc) throws CardAlreadyExistsException {
+    public void addCard(String name, String desc) throws CardAlreadyExistsException {
         if(cardExists(name)) throw new CardAlreadyExistsException();
-        todo.put(name, new Card(name, desc));
-        return true;
+        Card c = new Card(name, desc);
+        todo.put(name, c);
+        fileHandler.saveCard(this.name, c);
+    }
+
+    public void restoreCards(ArrayList<Card> cards){
+        for(Card c : cards){
+            cardLists.get(c.getStatus()).put(c.getName(), c);
+        }
+    }
+
+    public boolean isMember(String username){
+        return members.contains(username);
+    }
+
+    public ArrayList<String> getMembers(){
+        return members;
     }
 
     public ArrayList<Card> getCards(){
@@ -109,30 +146,6 @@ public class Project {
         allCards.addAll(toBeRevised.values());
         allCards.addAll(done.values());
         return allCards;
-    }
-
-    public boolean isMember(String username){
-        return members.containsKey(username);
-    }
-
-    public HashMap<String, User> getMembers(){
-        return members;
-    }
-
-    public HashMap<String, Card> getTodoList(){
-        return todo;
-    }
-
-    public HashMap<String, Card> getInProgressList(){
-        return inProgress;
-    }
-
-    public HashMap<String, Card> getToBeRevisedList(){
-        return toBeRevised;
-    }
-
-    public HashMap<String, Card> getDoneList(){
-        return done;
     }
 
     public boolean isAllDone(){

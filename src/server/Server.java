@@ -8,7 +8,10 @@ import interfaces.RMIServerInterface;
 import shared.Card;
 import shared.CardEvent;
 import shared.Project;
+import utils.FileHandler;
 import utils.PasswordHandler;
+import utils.Printer;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -25,6 +28,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Server {
+    private final String PROJECTDIR;
     private static final int CHANNEL_BUFFER_SIZE = 8192;
     private final int SOCKETPORT;
     private final int RMIPORT;
@@ -32,16 +36,19 @@ public class Server {
     private final String ADDRESS;
     private static final String REGISTRY_NAME =  "SIGN-UP-SERVER";
 
-    private final ConcurrentHashMap<String, User> registeredUsers = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Project> projects = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, User> registeredUsers;
+    private final ConcurrentHashMap<String, Project> projects;
 
     private static Selector selector;
+    private final FileHandler fileHandler;
 
 
-    public Server(String address, int channelport, int rmiport){
+    public Server(String address, int channelport, int rmiport, String workingdir) throws IOException {
         this.SOCKETPORT = channelport;
         this.RMIPORT = rmiport;
         this.ADDRESS = address;
+        this.PROJECTDIR = workingdir;
+
         try {
             ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
             serverSocketChannel.bind(new InetSocketAddress(SOCKETPORT));
@@ -52,12 +59,16 @@ public class Server {
             e.printStackTrace();
             System.exit(-1);
         }
+
+        //load files todo add path config
+        fileHandler = new FileHandler(PROJECTDIR);
+        registeredUsers = fileHandler.loadUsers();
+        projects = fileHandler.loadProjects();
     }
 
     public void start(){
-        System.out.println("---- Welcome to WORTH server (Progetto Reti Laboratorio a.a. 2020/20201) ----");
         startRMI();
-
+        Printer.println("> INFO: Server started", "green");
         while(true){
             try{
                 if(selector.select() == 0) continue;
@@ -75,11 +86,12 @@ public class Server {
                 e.printStackTrace();
             }
         }
+
     }
 
     private void startRMI(){
         try {
-            rmiServer = new RMIServer(registeredUsers);
+            rmiServer = new RMIServer(registeredUsers, PROJECTDIR);
             RMIServerInterface stub = (RMIServerInterface) UnicastRemoteObject.exportObject(rmiServer, RMIPORT);
             LocateRegistry.createRegistry(RMIPORT);
             //todo try to bind to non-localhost address!
@@ -95,7 +107,7 @@ public class Server {
     private void registerRead(Selector s, SelectionKey sk) throws IOException {
 
         //setting things ready for SocketChannel to receive data
-        System.out.println("Client connected!");
+        Printer.println("> INFO: Client connected!", "green");
         ServerSocketChannel serverSocketChannel = (ServerSocketChannel) sk.channel();
         SocketChannel socketChannel = serverSocketChannel.accept();
         socketChannel.configureBlocking(false);
@@ -124,7 +136,7 @@ public class Server {
                     u.setSessionPort(-1);
                 }
             }
-            System.out.println("CLIENT DISCONNECTED.");
+            Printer.println("> INFO: CLIENT DISCONNECTED.", "green");
             socketChannel.close();
             return;
         }
@@ -132,7 +144,7 @@ public class Server {
         buffer.flip();
         message = StandardCharsets.UTF_8.decode(buffer).toString();
 
-        System.out.println("> DEBUG: RECEIVED:" + message);
+        Printer.println("> DEBUG: RECEIVED:" + message, "yellow");
         buffer.clear();
 
         //parse message as JSON object to handle it easily
@@ -222,9 +234,9 @@ public class Server {
 
         while(buffer.hasRemaining()) socketChannel.write(buffer);
         buffer.flip();
-        System.out.println("> DEBUG: buffer content" + StandardCharsets.UTF_8.decode(buffer));
+        Printer.println("> DEBUG: buffer content" + StandardCharsets.UTF_8.decode(buffer), "yellow");
         buffer.clear(); //limit = pos = 0
-        System.out.println("> DEBUG: " + response);
+        Printer.println("> DEBUG: " + response, "yellow");
         socketChannel.register(selector, SelectionKey.OP_READ, buffer); //channel ready for new client requests.
     }
 
@@ -274,7 +286,7 @@ public class Server {
         return response;
     }
 
-    private JsonObject addProject(String projectname, String username){
+    private JsonObject addProject(String projectname, String username) throws IOException {
         JsonObject response = new JsonObject();
         User u = registeredUsers.get(username);
 
@@ -286,7 +298,11 @@ public class Server {
             response.addProperty("return-code", 409);
             return response;
         }
-        projects.put(projectname, new Project(projectname, u, null));
+
+        Project project = new Project(projectname, u, null, PROJECTDIR);
+
+        projects.put(projectname, project);
+        fileHandler.saveProject(project);
 
         response.addProperty("return-code", 201);
         return response;
@@ -303,7 +319,9 @@ public class Server {
         }
 
         try {
-            p.addCard(new Card(cardname, desc));
+            Card c = new Card(cardname, desc);
+            p.addCard(c);
+
         }catch (CardAlreadyExistsException e){
             response.addProperty("return-code", 409);
             return response;
@@ -442,7 +460,7 @@ public class Server {
         return response;
     }
 
-    private JsonObject addMember(String username, String newMember, String projectname){
+    private JsonObject addMember(String username, String newMember, String projectname) throws IOException {
         JsonObject response = new JsonObject();
 
         //check if current user is logged in
@@ -466,6 +484,7 @@ public class Server {
         }
 
         p.addMember(u);
+        fileHandler.saveProject(p);
         response.addProperty("return-code", 201);
         return response;
     }
@@ -493,7 +512,7 @@ public class Server {
         }
 
         JsonArray members = new JsonArray();
-        for(String s : p.getMembers().keySet()){
+        for(String s : p.getMembers()){
             members.add(s);
         }
 
