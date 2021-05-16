@@ -1,4 +1,4 @@
-package utils;
+package server.utils;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -31,7 +31,7 @@ public class FileHandler {
         projects= new File(projectpath);
 
         if(!base.exists()){
-            Printer.println("> Creating Project directories...", "yellow");
+            Printer.println("> Creating Project directories... -->" + projectdir, "yellow");
             boolean res = base.mkdir() && users.mkdir() && projects.mkdir();
             if(!res){
                 Printer.println(">ERROR: Failed to create project directories! Quitting.", "red");
@@ -122,6 +122,7 @@ public class FileHandler {
             Project p;
             try {
                 p = loadProject(projectpath + "/" + file);
+                p.setChatAddress(MulticastBaker.getNewMulticastAddress());
                 p.restoreCards(loadCards(projectpath + "/" + file));
                 projectsMap.put(p.getName(), p);
                 Printer.println("> INFO: Project " + file + " loaded", "green");
@@ -133,6 +134,25 @@ public class FileHandler {
         }
 
         return projectsMap;
+    }
+
+    public void deleteProject(String projectname){
+        File projectDir = new File(projectpath + "/" + projectname);
+        if(!projectDir.exists()){
+            Printer.println("> ERROR: Error while deleting project", "red");
+            return;
+        }
+
+        for(String file : projectDir.list()){
+            File f = new File(projectpath + "/" + projectname + "/" + file);
+            if(!f.delete()){
+                Printer.println("> ERROR: Errors while deleting project", "red");
+            }
+        }
+
+         if(!projectDir.delete()){
+             Printer.println("> ERROR: Errors while deleting project", "red");
+         }
     }
 
     private Project loadProject(String projectName) throws IOException {

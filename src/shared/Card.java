@@ -1,6 +1,6 @@
 package shared;
 
-import utils.Const;
+import server.utils.Const;
 
 import java.util.ArrayList;
 import java.util.Collections;

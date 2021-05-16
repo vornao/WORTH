@@ -8,17 +8,12 @@ import interfaces.RMIServerInterface;
 import shared.Card;
 import shared.CardEvent;
 import shared.Project;
-import utils.FileHandler;
-import utils.PasswordHandler;
-import utils.Printer;
+import server.utils.*;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
+import java.nio.channels.*;
 import java.nio.charset.StandardCharsets;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
@@ -34,20 +29,21 @@ public class Server {
     private final int RMIPORT;
     private RMIServer rmiServer = null;
     private final String ADDRESS;
-    private static final String REGISTRY_NAME =  "SIGN-UP-SERVER";
+    private final String REGISTRY_NAME;
 
     private final ConcurrentHashMap<String, User> registeredUsers;
     private final ConcurrentHashMap<String, Project> projects;
 
     private static Selector selector;
-    private final FileHandler fileHandler;
+    private final  FileHandler fileHandler;
 
 
-    public Server(String address, int channelport, int rmiport, String workingdir) throws IOException {
+    public Server(String address, int channelport, String registryname, int rmiport, String workingdir) throws IOException {
         this.SOCKETPORT = channelport;
         this.RMIPORT = rmiport;
         this.ADDRESS = address;
         this.PROJECTDIR = workingdir;
+        REGISTRY_NAME = registryname;
 
         try {
             ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
@@ -55,6 +51,7 @@ public class Server {
             serverSocketChannel.configureBlocking(false);
             selector = Selector.open();
             serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
+
         }catch(IOException e){
             e.printStackTrace();
             System.exit(-1);
@@ -68,7 +65,11 @@ public class Server {
 
     public void start(){
         startRMI();
-        Printer.println("> INFO: Server started", "green");
+        Printer.println(String.format(
+                "> INFO: Server started: \n\tTCP: %s:%d\n\tRMI: %s:%d @ %s\n\tProjectDirectory: %s\n",
+                ADDRESS, SOCKETPORT, ADDRESS, RMIPORT, REGISTRY_NAME, PROJECTDIR) ,
+                "green");
+
         while(true){
             try{
                 if(selector.select() == 0) continue;
@@ -127,7 +128,7 @@ public class Server {
         ByteBuffer buffer = (ByteBuffer) selectionKey.attachment();
 
         //client disconnected
-        if( socketChannel.read(buffer) < 0) {
+        if(socketChannel.read(buffer) < 0) {
 
             for(User u: registeredUsers.values()){
                 //if user was logged in, log out.
@@ -242,7 +243,7 @@ public class Server {
 
     //todo write nice user permissions check
 
-    private JsonObject login(String username, String password, int socketHash){
+    private JsonObject login(String username, String password, int socketHash) throws RemoteException {
         JsonObject response = new JsonObject();
         User u =  registeredUsers.get(username);
 
@@ -268,11 +269,13 @@ public class Server {
             userJson.addProperty("status", t.getStatus());
             jsonArray.add(userJson);
         }
+        JsonObject projects = listProjects(username);
         response.add("registered-users", jsonArray);
+        response.add("projects-list", projects.get("projects"));
         return response;
     }
 
-    private JsonObject logout(String username){
+    private JsonObject logout(String username) throws RemoteException {
         JsonObject response = new JsonObject();
 
         if(!registeredUsers.get(username).getStatus()){
@@ -299,9 +302,10 @@ public class Server {
             return response;
         }
 
-        Project project = new Project(projectname, u, null, PROJECTDIR);
+        Project project = new Project(projectname, u, MulticastBaker.getNewMulticastAddress(), PROJECTDIR);
 
         projects.put(projectname, project);
+        rmiServer.updateChat(username, projectname, project.getChatAddress());
         fileHandler.saveProject(project);
 
         response.addProperty("return-code", 201);
@@ -434,7 +438,12 @@ public class Server {
 
         JsonArray jsonArray = new JsonArray();
         for (Project p : projects.values()) {
-            if (p.isMember(username)) jsonArray.add(p.getName());
+            JsonObject jsonObject = new JsonObject();
+            if (p.isMember(username)){
+                jsonObject.addProperty("name", p.getName());
+                jsonObject.addProperty("chat-addr", p.getChatAddress());
+                jsonArray.add(jsonObject);
+            }
         }
 
         response.add("projects", jsonArray);
@@ -454,8 +463,10 @@ public class Server {
             response.addProperty("return-code", 403);
             return response;
         }
-
-        projects.remove(p.getName(), p);
+        projects.remove(p.getName());
+        MulticastBaker.releaseAddress(p.getChatAddress());
+        rmiServer.leaveGroup(p);
+        fileHandler.deleteProject(projectname);
         response.addProperty("return-code", 200);
         return response;
     }
@@ -484,6 +495,7 @@ public class Server {
         }
 
         p.addMember(u);
+        rmiServer.updateChat(newMember, projectname, p.getChatAddress());
         fileHandler.saveProject(p);
         response.addProperty("return-code", 201);
         return response;

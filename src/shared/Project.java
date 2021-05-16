@@ -5,15 +5,14 @@ import exceptions.CardAlreadyExistsException;
 import exceptions.CardMoveForbidden;
 import exceptions.CardNotFoundException;
 import server.User;
-import utils.Const;
-import utils.FileHandler;
+import server.utils.Const;
+import server.utils.FileHandler;
 import java.util.ArrayList;
 import java.util.HashMap;
 
 public class Project {
 
     private final String name;
-    private final String chatAddress;
     private final FileHandler fileHandler;
 
     private final HashMap<String, HashMap<String, Card>> cardLists;
@@ -22,6 +21,8 @@ public class Project {
     private final HashMap<String, Card> toBeRevised;
     private final HashMap<String, Card> done;
     private final ArrayList<String> members;
+    private String chatAddress;
+
 
     public Project(String projectname, User creator, String chatAddress, String projectdir){
         //initialize private project lists
@@ -87,6 +88,13 @@ public class Project {
     private boolean cardExists(String cardname){
         return (todo.containsKey(cardname) || inProgress.containsKey(cardname)) ||
                 (toBeRevised.containsKey(cardname) || done.containsKey(cardname));
+    }
+
+    public void setChatAddress(String addr){
+        this.chatAddress = addr;
+    }
+    public String getChatAddress(){
+        return chatAddress;
     }
 
     public JsonObject getCardJson(String name) throws CardNotFoundException {

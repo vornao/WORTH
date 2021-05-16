@@ -1,23 +1,25 @@
 package server;
 
-import client.RMIClient;
 import interfaces.RMIClientInterface;
 import interfaces.RMIServerInterface;
-import utils.FileHandler;
-import utils.PasswordHandler;
-import utils.Printer;
+import server.utils.FileHandler;
+import server.utils.PasswordHandler;
+import server.utils.Printer;
+import shared.Project;
 
-import java.io.IOException;
 import java.rmi.RemoteException;
 import java.rmi.server.RemoteServer;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class RMIServer extends RemoteServer implements RMIServerInterface {
     private final ConcurrentHashMap<String, User> userList;
-    private final List<RMIClientInterface> clients = new ArrayList<>();
+    private final List<RMIClientInterface> clients = Collections.synchronizedList(new ArrayList<>());
     private final FileHandler fh;
+
     public RMIServer(ConcurrentHashMap<String, User> userList, String projectdir){
         this.userList = userList;
         this.fh = new FileHandler(projectdir);
@@ -55,15 +57,49 @@ public class RMIServer extends RemoteServer implements RMIServerInterface {
         }
     }
 
-    public synchronized void updateUsers(String username, Boolean status){
-        for (RMIClientInterface client : clients) {
+    public synchronized void updateUsers(String username, Boolean status) throws RemoteException{
+
+        //using an iterator to avoid ConcurrentModificationException for removing while iterating on collection
+        Iterator<RMIClientInterface> iterator = clients.iterator();
+        while(iterator.hasNext()) {
             try {
-                client.notifyUser(username, status);
+                iterator.next().notifyUser(username, status);
             } catch (RemoteException e) {
                 //client no longer available
-                clients.remove(client);
-                e.printStackTrace();
+                iterator.remove();
+                //e.printStackTrace();
             }
         }
     }
+
+    public synchronized void updateChat(String username, String projectname, String address) throws RemoteException{
+        //using an iterator to avoid ConcurrentModificationException for removing while iterating on collection
+        Iterator<RMIClientInterface> iterator = clients.iterator();
+        while(iterator.hasNext()) {
+            try {
+                RMIClientInterface client = iterator.next();
+                if(client.getUsername().equals(username)) client.notifyChat(address, projectname);
+            } catch (RemoteException e) {
+                //client no longer available
+                iterator.remove();
+                //e.printStackTrace();
+            }
+        }
+    }
+
+    public synchronized void leaveGroup(Project p){
+        ArrayList<String> users = p.getMembers();
+        Iterator<RMIClientInterface> iterator = clients.iterator();
+        while(iterator.hasNext()) {
+            try {
+                RMIClientInterface client = iterator.next();
+                if(users.contains(client.getUsername())) client.leaveGroup(p.getChatAddress(), p.getName());
+            } catch (RemoteException e) {
+                //client no longer available
+                iterator.remove();
+                //e.printStackTrace();
+            }
+        }
+    }
+
 }

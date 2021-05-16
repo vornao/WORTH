@@ -1,4 +1,4 @@
-package utils;
+package server.utils;
 
 public class Printer {
     /** utility to print fancy ANSI terminal colors. */
