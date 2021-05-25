@@ -222,9 +222,59 @@ I metodi della classe FileHandler si suddividono in metodi \emph{loader} e metod
 
 \newpage
 \section{Implementazione del Client}
-\subsection{Interfaccia a riga di comando (CLI)}
-\subsection{Interfaccia grafica (GUI)}
+Il Client implementa le funzionalità con cui gli utenti di WORTH interagiscono col server e svolgono le proprie azioni. È stato sviluppato sia un client a riga di comando, sia un'interfaccia grafica. Per quanto riguarda l'interfaccia grafica, la maggior parte dei costrutti sono stati ereditati dal client CLI e riadattati. 
 
+\subsection{Interfaccia a riga di comando (CLI)}
+Il client a riga di comando, è stato sviluppato utilizzando Java 8. Si compone di tre classi principali: La classe Main, che si occupa dell'interazione con gli utenti, la classe Client, che implementa i metodi per gestire la connessione TCP col client, e la classe ChatHelper, che si occupa di ricevere e inviare i messaggi relativi alle chat di progetto. I riferimenti al server sono specificati dall'utente al momento dell'avvio del programma, attraverso riga di comando; se non sono specificati argomenti sono utilizzati i valori di default: in particolare, in caso di assenza di riferimenti al server, il client tenterà la connessione sull'indirizzo IP locale della macchina su cui si trova in esecuzione. In caso di connessione impossibile da stabilire, è visualizzato un messaggio di errore e l'esecuzione è terminata. Inoltre, al momento dell'avvio, è stabilita una connessione anche al registry RMI del server, per operazioni di registrazione e callback.
+
+\subsubsection{I messaggi verso il Server}
+All'inizio dell'esecuzione, sono stampati a terminale i comandi disponibili per essere selezionati. L'utente è guidato durante l'esecuzione di un comando: l'input da tastiera è stato realizzato utilizzato un \texttt{BufferedStreamReader}. Al completamento di un comando, è effettuato il parsing degli argomenti in un oggetto JsonObject: come per il server è stata utilizzata la libreria GSON. Ogni messaggio inviato dal Client, contiene il campo \texttt{method} per specificare l'operazione che si intende eseguire, e il campo \texttt{username}: questi campi sono obbligatori perché il server possa accettare la richiesta. Al termine della serializzazione in Stringa JSON, il messaggio è inviato attraverso un SocketChannel, e si rimane in attesa di una risposta dal Server: se la richiesta è andata a buon fine, viene visualizzato il contenuto richiesto, altrimenti è visualizzato un messaggio di errore con relativo codice.
+
+\subsubsection{RMI e Callback}
+Al momento dell'operazione di login, il client registra uno stub con i riferimenti agli oggetti locali del tipo \texttt{RMIClientInterface} sul server, in modo che possano essere utilizzati meccanismi di callback al verificarsi di determinati eventi: le callback RMI sono state utilizzate per mantenere aggiornata sul client la lista degli utenti iscritti al servizio, e per comunicare i riferimenti relativi alla chat di un progetto durante l'esecuzione del client; sebbene, infatti, il client recuperi la lista degli indirizzi multicast relativi alle chat dei progetti al momento del login, utilizzando le callback è possibile ricevere una notifica relativa a nuovi progetti in tempo reale, senza che l'utente debba aggiornare manualmente le liste di progetto; analogamente viene ricevuta una notifica anche al momento dell'eliminazione di un progetto, con conseguente abbandono del gruppo Multicast.\newline
+
+\begin{lstlisting}[language=Java, caption=Interfaccia \texttt{RMIClientInterface.java}]
+public interface RMIClientInterface extends Remote {
+    void notifyUser(String username, Boolean status)    throws RemoteException;
+    void notifyChat(String address, String projectname) throws RemoteException;
+    void leaveGroup(String address, String projectname) throws RemoteException;
+    String getUsername()                                throws RemoteException;
+}
+\end{lstlisting}
+
+\subsubsection{Implementazione della chat con DatagramChannel}
+La chat di progetto è implementata utilizzando IP Multicast: in questo modo, un singolo client può inviare un datagramma UDP ad un gruppo di client interessati, e i messaggi chat possono essere inviati direttamente da client a client, senza utilizzare un server intermedio.
+Le funzionalità della chat sono state implementate nella classe \texttt{ChatHelper}. Al momento dell'istanziazione della classe, sono inizializzate le strutture dati per la memorizzazione dei riferimenti e dei messaggi ricevuti durante la sessione, ed è aperto un socket UDP per la ricezione dei pacchetti Multicast. 
+Per la ricezione dei datagrammi UDP, è stato utilizzato un oggetto della classe \texttt{DatagramChannel}, in modalità non bloccante. Al momento del login, il server comunica al client una mappa chiave-valore, in formato JSON, contenente per ogni entry una coppia del tipo (nome-progetto, indirizzo-chat). Per ogni entry della mappa, il client invoca sull'oggetto ChatHelper il metodo \texttt{joinGroup}, passando come argomento una entry della mappa; a questo punto, ChatHelper invoca il metodo \texttt{join()} sul DatagramChannel locale. E' mantenuta inoltre in memoria la coppia (nome-progetto, \texttt{MembershipKey}), in modo da poter revocare la sottoscrizione ad un gruppo multicast in caso di cancellazione di un progetto. Il metodo \texttt{leaveGroup} per l'abbandono di un gruppo è invocato dal server tramite Callback RMI, a cura del metodo \texttt{Server.deleteProject()}.
+Per la lettura dei dati dal canale, è utilizzato un thread che invoca periodicamente il metodo \texttt{readDatagramChannel()}, in modo da avere la lista dei messaggi per ogni progetto sempre aggiornata. Il controllo degli accessi concorrenti all'oggetto è garantito dall'utilizzo di strutture dati concorrenti; Inoltre le classi DatagramChannel e Selector, sono \emph{thread safe}, secondo quanto specificato nella documentazione ufficiale di Java.
+Al momento dell'invio di un messaggio, il client chiama il metodo \texttt{sendmessage()} sull'oggetto chatHelper. Il DatagramChannel si occuperà di inviare i messaggi all'indirizzo specificato.
+
+\subsection{Interfaccia grafica (GUI)}
+Per questo progetto, è stato sviluppato anche un client GUI, in modo da rendere più gradevole e intuitivo l'utilizzo della piattaforma. L'interfaccia grafica è stata sviluppata utilizzando il framework JavaFX, supportato da Java 11. Gran parte del \emph{backend} è stato ereditato dal codice sorgente del client CLI, tuttavia sono state eliminate le parti relative alla gestione I/O testuale, in particolare gli oggetti InputStream per la lettura dell'input da tastiera.
+Le finestre e il layout della GUI sono descritti in files FXML, per semplicità di sviluppo. Ad ogni è stato associato un Controller per gestire le operazioni dell'utente: i metodi della classe Client sono ora invocati attraverso eventi sulla finestra sulla finestra o tramite eventi rilevati su oggetti Button. Il client GUI possiede anche classi "lite" delle componenti della piattaforma WORTH, istanziate al momento del recupero di informazioni dal server, in modo da avere strutture dati più robuste rispetto al solo JSON utilizzato dalla CLI.
+
+\subsubsection{Implementazione della chat grafica}
+Sostanziale è la differenza nel modo in cui gli utenti possono accedere alla chat, rispetto al client testuale. Per migliorare l'esperienza d'uso, la TextArea riguardante la chat di progetto è ricaricata al momento della selezione di un progetto dalla lista, e viene aggiornata attraverso un meccanismo di callback direttamente dal thread ChatListener, alla ricezione di un nuovo datagramma.
+
+ Al momento della creazione della finestra principale, in seguito al login, è creato anche un oggetto della classe ChatCallback, implementante l'interfaccia ChatCallbackHandler, nota a ChatHelper, e si occupa di aggiornare le strutture dati locali del client che persistono i messaggi. Un riferimento a ChatCallback è impostato sull'istanza ChatHandler: a questo punto, alla ricezione di un nuovo messaggio, ChatHandler invocherà il metodo \texttt{handleMessage()} sul proprio riferimento a ChatCallback: è chiamato dunque il metodo \texttt{notifyMessage()} del Controller JavaFX \footnote{Il controller della main window è implementato dalla classe \texttt{WorthController.java}.}associato alla finestra principale: a questo punto, il messaggio ricevuto è salvato in una lista contenuta all'interno di un'istanza di \texttt{ConcurrentHashMap}, in modo da essere visualizzato sulla TextArea alla selezione del progetto corrispondente. Se in quel momento è selezionato il progetto relativo al messaggio ricevuto, la TextArea è aggiornata, e il messaggio visualizzato in tempo reale.\newline
+ 
+\begin{lstlisting}[language=Java, caption=Il metodo \texttt{notifyMessage()}]
+public void notifyMessage(String projectname, String message){
+    if(!messages.containsKey(projectname)) 
+        messages.putIfAbsent(projectname, new ArrayList<>());
+        
+    messages.get(projectname).add(message);
+    if (projectsTable
+        .getSelectionModel()
+        .getSelectedItem()
+        .getName()
+        .equals(projectname)){
+        chatArea.appendText(message + "\n");
+    }
+}
+\end{lstlisting}
+
+\newpage
 \section{Quick start guide}
 \subsection{Istruzioni per la compilazione e l'esecuzione}
 \subsection{Utilizzo dell'interfaccia a riga di comando}
