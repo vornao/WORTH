@@ -37,7 +37,6 @@ public class Server {
     private static Selector selector;
     private final  FileHandler fileHandler;
 
-
     public Server(String address, int channelport, String registryname, int rmiport, String workingdir) throws IOException {
         this.SOCKETPORT = channelport;
         this.RMIPORT = rmiport;
@@ -57,7 +56,6 @@ public class Server {
             System.exit(-1);
         }
 
-        //load files todo add path config
         fileHandler = new FileHandler(PROJECTDIR);
         registeredUsers = fileHandler.loadUsers();
         projects = fileHandler.loadProjects();
@@ -79,7 +77,7 @@ public class Server {
                 while(keysIterator.hasNext()){
                     SelectionKey sk = keysIterator.next();
                     keysIterator.remove();
-                    if (sk.isAcceptable()) registerRead(selector, sk);
+                    if (sk.isAcceptable()) accept(selector, sk);
                     else if (sk.isReadable()) readSocketChannel(selector, sk);
                 }
 
@@ -105,7 +103,7 @@ public class Server {
         }
     }
 
-    private void registerRead(Selector s, SelectionKey sk) throws IOException {
+    private void accept(Selector s, SelectionKey sk) throws IOException {
 
         //setting things ready for SocketChannel to receive data
         Printer.println("> INFO: Client connected!", "green");
@@ -118,7 +116,6 @@ public class Server {
 
         //socket is now ready for reading up to 8kb of incoming data from client.
         socketChannel.register(s, SelectionKey.OP_READ, byteBuffer);
-
     }
 
     private void readSocketChannel(Selector selector, SelectionKey selectionKey) throws IOException {
@@ -129,7 +126,6 @@ public class Server {
 
         //client disconnected
         if(socketChannel.read(buffer) < 0) {
-
             for(User u: registeredUsers.values()){
                 //if user was logged in, log out.
                 if(u.getSessionPort() == socketChannel.getRemoteAddress().hashCode()){
@@ -241,8 +237,6 @@ public class Server {
         socketChannel.register(selector, SelectionKey.OP_READ, buffer); //channel ready for new client requests.
     }
 
-    //todo write nice user permissions check
-
     private JsonObject login(String username, String password, int socketHash) throws RemoteException {
         JsonObject response = new JsonObject();
         User u =  registeredUsers.get(username);
@@ -301,10 +295,16 @@ public class Server {
             response.addProperty("return-code", 409);
             return response;
         }
+        String multicastAddress = MulticastBaker.getNewMulticastAddress();
 
-        Project project = new Project(projectname, u, MulticastBaker.getNewMulticastAddress(), PROJECTDIR);
 
-        projects.put(projectname, project);
+        if(multicastAddress == null){
+            response.addProperty("return-code", 500);
+            return response;
+        }
+
+        Project project = new Project(projectname, u, multicastAddress, fileHandler);
+        projects.putIfAbsent(projectname, project);
         rmiServer.updateChat(username, projectname, project.getChatAddress());
         fileHandler.saveProject(project);
 
@@ -361,23 +361,30 @@ public class Server {
         Project p = projects.get(projectname);
 
         //permissions checks
-        if(!isLoggedIn(username) || p == null || !p.isMember(username) ) {
+        if (!isLoggedIn(username) || p == null || !p.isMember(username)) {
             response.addProperty("return-code", 401);
             return response;
         }
 
-        ArrayList<Card> cardList = p.getCards();
-        JsonArray cardsJson = new JsonArray();
-        for(Card c : cardList){
-            JsonObject json = new JsonObject();
-            json.addProperty("card-name", c.getName());
-            json.addProperty("card-state", c.getStatus());
-            cardsJson.add(json);
-        }
+        try {
 
-        response.addProperty("return-code", 200);
-        response.add("card-list", cardsJson);
-        return response;
+            ArrayList<Card> cardList = p.getCards();
+            JsonArray cardsJson = new JsonArray();
+            for (Card c : cardList) {
+                JsonObject json = new JsonObject();
+                json.addProperty("card-name", c.getName());
+                json.addProperty("card-state", c.getStatus());
+                json.addProperty("card-desc", c.getDescription());
+                cardsJson.add(json);
+            }
+
+            response.addProperty("return-code", 200);
+            response.add("card-list", cardsJson);
+            return response;
+        }catch (Exception e){
+            response.addProperty("return-code", 500);
+            return response;
+        }
     }
 
     private JsonObject showCard(String username, String projectname, String cardname){

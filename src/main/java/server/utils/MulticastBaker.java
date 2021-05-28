@@ -3,11 +3,11 @@ package server.utils;
 import java.util.ArrayList;
 
 public class MulticastBaker {
-    private static int multicastSuffix = 0x000000;
+    private static int multicastSuffix = 0x000001;
     private static final int[] address = new int[4];
     private static final ArrayList<String> reusableAddresses = new ArrayList<>();
 
-
+    //returns new multicast address in 224.0.0.0/24
     public static String getNewMulticastAddress() {
         //set first octet to multicast address scope
         address[0] = 0xE0;
@@ -24,7 +24,6 @@ public class MulticastBaker {
             return address[0] + "." + address[1] + "." + address[2] + "." + address[3]; //return 224.x.x.x string
         } else return null;
     }
-
 
     public static void releaseAddress(String address){
         reusableAddresses.add(address);

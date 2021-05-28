@@ -25,7 +25,6 @@ import java.util.concurrent.ConcurrentHashMap;
 //export CLASSPATH=$CLASSPATH:/Users/vornao/Developer/university/WORTH/lib/gson-2.8.6.jar
 
 public class Client {
-    //todo parse command line arguments
     private final int    RMI_SERVER_PORT;
     private final int    PORT;
     private final String REGISTRY_NAME;
@@ -43,8 +42,7 @@ public class Client {
 
     Gson gson = new Gson();
 
-    //todo server side return different codes
-    //todo create enum to convert server codes into fancy string
+
     private static final HashMap<Integer, String> SignupErrorMessages = new HashMap<Integer, String>() {
         {
             put(1, "> User created successfully");
@@ -119,15 +117,27 @@ public class Client {
 
     /** display help message */
     public void printHelp() {
-        System.out.println("+---------------- Help Dialog --------------+");
-        System.out.println("|    login        - log in to service       |");
-        System.out.println("|    logout       - log out from service    |");
-        System.out.println("|    signup       - register user utility   |");
-        System.out.println("|    list-users   - list registered users   |");
-        System.out.println("|    list-online  - list registered users   |");
-        System.out.println("|    help         - show this message       |");
-        System.out.println("|    quit         - logout and exit         |");
-        System.out.println("+-------------------------------------------+");
+        System.out.println("+---------------- Help Dialog -----------------+");
+        System.out.println("|    login           - log in to service       |");
+        System.out.println("|    logout          - log out from service    |");
+        System.out.println("|    signup          - register user utility   |");
+        System.out.println("|    list-users      - list registered users   |");
+        System.out.println("|    list-online     - list registered users   |");
+        System.out.println("|    add-project     - create new project      |");
+        System.out.println("|    add-member      - add new member to proj  |");
+        System.out.println("|    list-members    - list project members    |");
+        System.out.println("|    list-projects   - list all your projects  |");
+        System.out.println("|    delete-project  - delete project          |");
+        System.out.println("|    add-card        - add new card            |");
+        System.out.println("|    list-cards      - list all project's cards|");
+        System.out.println("|    move-card       - move card               |");
+        System.out.println("|    show-card       - show card info          |");
+        System.out.println("|    card-history    - show card history       |");
+        System.out.println("|    send-chat       - send new chat message   |");
+        System.out.println("|    read-chat       - read project chat       |");
+        System.out.println("|    help            - show this message       |");
+        System.out.println("|    quit            - logout and exit         |");
+        System.out.println("+----------------------------------------------+");
     }
 
     /**
@@ -203,14 +213,14 @@ public class Client {
         } catch (IOException | JsonIOException e) {
             e.printStackTrace();
             Printer.println("< ERROR: Error sending message to server", "red");
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
 
-        //todo ask for project list in order to retreive chat info
         registerForCallback();
     }
 
     /**
-     *
      * Log out method. First checks if user is logged in
      * If not logged in print red error message;
      * else will send a logout json-formatted message to server, and wait for response

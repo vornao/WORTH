@@ -24,14 +24,14 @@ public class RMIClient extends RemoteObject implements RMIClientInterface {
     /** called from server when event occurs*/
     @Override
     public synchronized void notifyUser(String username, Boolean status) throws RemoteException {
-        users.put(username, status);
+        users.putIfAbsent(username, status);
     }
 
     @Override
     public synchronized void notifyChat(String address, String projectname) throws RemoteException{
         try{
             chatHelper.joinGroup(address, projectname);
-        }catch (IOException e){
+        }catch (IOException | InterruptedException e){
             e.printStackTrace();
         }
     }

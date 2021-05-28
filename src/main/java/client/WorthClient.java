@@ -41,8 +41,8 @@ public class WorthClient {
                 throw new ParseException("help dialog");
             }
 
-            if (commandLine.hasOption("b") || commandLine.hasOption("--bind-address"))
-                 ADDRESS = (commandLine.getOptionValues("b")[0]);
+            if (commandLine.hasOption("s") || commandLine.hasOption("--bind-address"))
+                 ADDRESS = (commandLine.getOptionValues("s")[0]);
             else ADDRESS = InetAddress.getLocalHost().getHostAddress();
 
             if (commandLine.hasOption("p") || commandLine.hasOption("--tcp-port") )
@@ -76,43 +76,86 @@ public class WorthClient {
             chatHelper = new ChatHelper(CHAT_PORT, CHAT_SOCKET_ADDR);
             client = new Client(ADDRESS, TCP_PORT, RMI_PORT, REGISTRY_NAME, chatHelper);
 
-        }catch (IOException e){
+        }catch (IOException | NotBoundException e){
             Printer.println("Failed to connect WORTH server, quit.", "red");
             return;
         }
 
         Thread chat = new Thread(new ChatListener(chatHelper));
         chat.start();
+        try {
+            System.out.println("--- Welcome to WORTH CLI client! ---\n");
+            client.printHelp();
+            BufferedReader buf = new BufferedReader(new InputStreamReader(System.in));
 
-        System.out.println( "--- Welcome to WORTH CLI client! ---\n");
-        client.printHelp();
-        BufferedReader buf =  new BufferedReader(new InputStreamReader(System.in));
-
-        while(true){
-            System.out.print("> ");
-            switch (buf.readLine()){
-                case "read-chat"     : client.readChat();       break;
-                case "send-chat"     : client.sendChat();       break;
-                case "help"          : client.printHelp();      break;
-                case "signup"        : client.signUp();         break;
-                case "login"         : client.login();          break;
-                case "logout"        : client.logout();         break;
-                case "list-projects" : client.listProjects();   break;
-                case "add-project"   : client.createProject();  break;
-                case "add-member"    : client.addMember();      break;
-                case "add-card"      : client.addCard();        break;
-                case "show-card"     : client.showCard();       break;
-                case "list-cards"    : client.listCards();      break;
-                case "list-members"  : client.showMembers();    break;
-                case "move-card"     : client.moveCard();       break;
-                case "card-history"  : client.getCardHistory(); break;
-                case "delete-project": client.deleteProject();  break;
-                case "clear"         : client.clear();          break;
-                case "quit"          : client.quit();           break;
-                case "list-users"    : client.listUsers(false); break;
-                case "list-online"   : client.listUsers(true); break;
-                default              : System.out.println("< Unknown command - type help for command list."); break;
+            while (true) {
+                System.out.print("> ");
+                switch (buf.readLine()) {
+                    case "read-chat":
+                        client.readChat();
+                        break;
+                    case "send-chat":
+                        client.sendChat();
+                        break;
+                    case "help":
+                        client.printHelp();
+                        break;
+                    case "signup":
+                        client.signUp();
+                        break;
+                    case "login":
+                        client.login();
+                        break;
+                    case "logout":
+                        client.logout();
+                        break;
+                    case "list-projects":
+                        client.listProjects();
+                        break;
+                    case "add-project":
+                        client.createProject();
+                        break;
+                    case "add-member":
+                        client.addMember();
+                        break;
+                    case "add-card":
+                        client.addCard();
+                        break;
+                    case "show-card":
+                        client.showCard();
+                        break;
+                    case "list-cards":
+                        client.listCards();
+                        break;
+                    case "list-members":
+                        client.showMembers();
+                        break;
+                    case "move-card":
+                        client.moveCard();
+                        break;
+                    case "card-history":
+                        client.getCardHistory();
+                        break;
+                    case "delete-project":
+                        client.deleteProject();
+                        break;
+                    case "quit":
+                        client.quit();
+                        break;
+                    case "list-users":
+                        client.listUsers(false);
+                        break;
+                    case "list-online":
+                        client.listUsers(true);
+                        break;
+                    default:
+                        System.out.println("< Unknown command - type help for command list.");
+                        break;
+                }
             }
+        } catch (Exception e){
+            Printer.println("Fatal IO exception. Check your connection status.", "red");
+            return;
         }
     }
 }

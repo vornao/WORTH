@@ -19,29 +19,29 @@ public class FileHandler {
     private final File users;
     private final File projects;
 
-    private final Gson serializer = setGson();
+    private final Gson serializer;
 
     public FileHandler(String projectdir){
         String basepath = projectdir + "/worth";
-        userspath = basepath + "/users";
-        projectpath = basepath + "/projects";
+        userspath   = basepath +       "/users";
+        projectpath = basepath +    "/projects";
 
         File base = new File(basepath);
         users = new File(userspath);
         projects= new File(projectpath);
-
+        serializer = setGson();
         if(!base.exists()){
             Printer.println("> Creating Project directories... -->" + projectdir, "yellow");
             boolean res = base.mkdir() && users.mkdir() && projects.mkdir();
             if(!res){
-                Printer.println(">ERROR: Failed to create project directories! Quitting.", "red");
+                Printer.println("> ERROR: Failed to create project directories! Quitting.", "red");
                 System.exit(-1);
             }
         }
     }
 
     private Gson setGson(){
-        FileSerializerHelper serializers = new FileSerializerHelper();
+        FileSerializerHelper serializers = new FileSerializerHelper(this);
         GsonBuilder builder = new GsonBuilder();
         builder.registerTypeAdapter(Project.class, serializers.projectJsonSerializer);
         builder.registerTypeAdapter(Project.class, serializers.projectJsonDeserializer);
@@ -54,7 +54,7 @@ public class FileHandler {
         return builder.create();
     }
 
-    public void saveUser(User user) {
+    public synchronized void saveUser(User user) {
         String userJson = serializer.toJson(user);
         File newUser = new File(userspath + "/" + user.getUsername() + ".json");
         try {
@@ -66,7 +66,7 @@ public class FileHandler {
         }
     }
 
-    public void saveProject(Project project) throws IOException {
+    public synchronized void saveProject(Project project) throws IOException {
         String projectJson = serializer.toJson(project);
         File projectDir = new File(projectpath + "/" + project.getName());
         if(!projectDir.exists()){
@@ -81,7 +81,7 @@ public class FileHandler {
         fw.close();
     }
 
-    public void saveCard(String projectname, Card card){
+    public synchronized void saveCard(String projectname, Card card){
         String cardJson = serializer.toJson(card);
         File newCard = new File(projectpath + "/" + projectname + "/" + card.getName() + ".json");
         try {
@@ -103,7 +103,7 @@ public class FileHandler {
         for(String file : Objects.requireNonNull(users.list())){
             if(!file.contains(".json")) continue;
             User user = serializer.fromJson(fileToString(userspath + "/" + file), User.class);
-            userlist.put(user.getUsername(), user);
+            userlist.putIfAbsent(user.getUsername(), user);
         }
 
         return userlist;
@@ -124,7 +124,7 @@ public class FileHandler {
                 p = loadProject(projectpath + "/" + file);
                 p.setChatAddress(MulticastBaker.getNewMulticastAddress());
                 p.restoreCards(loadCards(projectpath + "/" + file));
-                projectsMap.put(p.getName(), p);
+                projectsMap.putIfAbsent(p.getName(), p);
                 Printer.println("> INFO: Project " + file + " loaded", "green");
             }catch (IOException e){
                 Printer.println(
@@ -136,7 +136,7 @@ public class FileHandler {
         return projectsMap;
     }
 
-    public void deleteProject(String projectname){
+    public synchronized void deleteProject(String projectname){
         File projectDir = new File(projectpath + "/" + projectname);
         if(!projectDir.exists()){
             Printer.println("> ERROR: Error while deleting project", "red");

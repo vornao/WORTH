@@ -17,13 +17,12 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ChatHelper {
-
+    private boolean reading = false;
     //key value store for mcast addresses and projects <projectname, address>
     private final ConcurrentHashMap<String, String> projectChats;
     private final ConcurrentHashMap<String, MembershipKey> groupKeys;
     //key value stores for last-received messages <projectnme, last read messages>
     private final ConcurrentHashMap<String, List<String>> messages;
-
 
     //multicast "connection" handlers
     private final NetworkInterface networkInterface;
@@ -48,8 +47,6 @@ public class ChatHelper {
 
     //synchronized on selector, to avoid concurrent selector modifications.
     public void startChatListener(){
-
-        synchronized (selector) {
             try {
                 if (selector.select() == 0) return;
                 Set<SelectionKey> selectedKeys = selector.selectedKeys();
@@ -58,26 +55,25 @@ public class ChatHelper {
                 while (keysIterator.hasNext()) {
                     SelectionKey selectionKey = keysIterator.next();
                     keysIterator.remove();
-                    if (selectionKey.isReadable()) readSocketChannel(selector, selectionKey);
+                    if (selectionKey.isReadable()) readDatagramChannel(selector, selectionKey);
                 }
             } catch (IOException e) {
                 e.printStackTrace();
             }
-        }
     }
 
-    public synchronized void joinGroup(String address, String projectname) throws IOException {
+    public void joinGroup(String address, String projectname) throws IOException, InterruptedException {
         MembershipKey membershipKey = datagramChannel.join(InetAddress.getByName(address), networkInterface);
-        projectChats.put(projectname, address);
+        projectChats.putIfAbsent(projectname, address);
 
-        groupKeys.put(address, membershipKey);
+        groupKeys.putIfAbsent(address, membershipKey);
         //the arraylist in the hashmap need to be synchronized too.
-        messages.put(projectname, Collections.synchronizedList(new ArrayList<>()));
+        messages.putIfAbsent(projectname, Collections.synchronizedList(new ArrayList<>()));
 
-        Printer.print("> DEBUG: " + projectChats, "yellow");
+        Printer.println("> DEBUG: " + projectChats, "yellow");
     }
 
-    public synchronized void leaveGroup(String address, String projectname){
+    public void leaveGroup(String address, String projectname){
         projectChats.remove(projectname, address);
         messages.remove(projectname);
         groupKeys.remove(address).drop();
@@ -89,7 +85,7 @@ public class ChatHelper {
      * synchronized on this to prevent concurrent modifications to datagramChannel (e.g. a thread calls joinGroup)
      */
 
-    private synchronized void readSocketChannel(Selector selector, SelectionKey selectionKey) throws IOException {
+    private void readDatagramChannel(Selector selector, SelectionKey selectionKey) throws IOException {
         DatagramChannel dc = (DatagramChannel) selectionKey.channel();
         dc.configureBlocking(false);
         ByteBuffer buffer = ByteBuffer.wrap(new byte[512]);
@@ -106,13 +102,12 @@ public class ChatHelper {
                     message.get("body").getAsString());
 
             messages.get(message.get("projectname").getAsString()).add(formattedMessage);
-        }catch (Exception e){
-            e.printStackTrace();
+        }catch (Exception ignored){
         }
         dc.register(selector, SelectionKey.OP_READ);
     }
 
-    public synchronized void sendMessage(String project, String from, String body) throws IOException, ProjectNotFoundException {
+    public void sendMessage(String project, String from, String body) throws IOException, ProjectNotFoundException {
         JsonObject message = new JsonObject();
         message.addProperty("projectname", project);
         message.addProperty("from", from);
@@ -132,5 +127,8 @@ public class ChatHelper {
         return this.messages.get(projectname);
     }
 
+    public void close() throws IOException {
+        datagramChannel.close();
+    }
 
 }

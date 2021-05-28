@@ -2,13 +2,20 @@ package shared.serializers;
 
 import com.google.gson.*;
 import server.User;
+import server.utils.FileHandler;
 import shared.Card;
 import shared.CardEvent;
 import shared.Project;
 
+import java.io.File;
 import java.util.ArrayList;
 
 public class FileSerializerHelper {
+    private FileHandler fh;
+
+    public FileSerializerHelper(FileHandler fileHandler){
+        fh = fileHandler;
+    }
 
     public JsonSerializer<Project> projectJsonSerializer = (project, type, jsonSerializationContext) -> {
         JsonObject serialized = new JsonObject();
@@ -28,7 +35,7 @@ public class FileSerializerHelper {
         for(JsonElement e : jsonArray){
             members.add(e.getAsString());
         }
-        return new Project(jsonObject.get("name").getAsString(), members, null, "/users/Vornao/Desktop/");
+        return new Project(jsonObject.get("name").getAsString(), members, null, fh);
     };
 
     public JsonSerializer<User> userJsonSerializer = (user, type, jsonSerializationContext) -> {

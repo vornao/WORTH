@@ -1,6 +1,4 @@
 package server;
-
-import com.sun.org.apache.regexp.internal.RE;
 import org.apache.commons.cli.*;
 import server.utils.Printer;
 
@@ -11,11 +9,10 @@ public class WorthServer {
 
     private static int TCP_PORT = 0;
     private static int RMI_PORT = 0;
-    private static String ADDRESS;
-    private static String WORTHDIR;
-    private static String REGISTRY_NAME;
-
-
+    private static String ADDRESS = null;
+    private static String WORTHDIR = null;
+    private static String REGISTRY_NAME = null;
+;
     //todo handle exceptions
     public static void main(String[] args) throws IOException {
 
@@ -40,7 +37,7 @@ public class WorthServer {
 
             if (commandLine.hasOption("b") || commandLine.hasOption("--bind-address"))
                  ADDRESS = (commandLine.getOptionValues("b")[0]);
-            else ADDRESS = InetAddress.getLocalHost().getHostAddress();;
+            else ADDRESS = InetAddress.getLocalHost().getHostAddress();
 
             if (commandLine.hasOption("p") || commandLine.hasOption("--tcp-port") )
                  TCP_PORT = Integer.parseInt(commandLine.getOptionValues("p")[0]);

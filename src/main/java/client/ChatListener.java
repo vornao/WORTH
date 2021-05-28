@@ -1,5 +1,7 @@
 package client;
 
+import java.io.IOException;
+
 public class ChatListener implements Runnable{
     private final ChatHelper chatHelper;
 
@@ -11,6 +13,11 @@ public class ChatListener implements Runnable{
     public void run() {
         while(!Thread.interrupted()) {
             chatHelper.startChatListener();
+        }
+        try {
+            chatHelper.close();
+        } catch (IOException ignored) {
+
         }
     }
 }

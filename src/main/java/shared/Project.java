@@ -7,6 +7,8 @@ import exceptions.CardNotFoundException;
 import server.User;
 import server.utils.Const;
 import server.utils.FileHandler;
+
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -15,6 +17,7 @@ public class Project {
     private final String name;
     private final FileHandler fileHandler;
 
+    //used for querying all list by name
     private final HashMap<String, HashMap<String, Card>> cardLists;
     private final HashMap<String, Card> todo;
     private final HashMap<String, Card> inProgress;
@@ -24,11 +27,11 @@ public class Project {
     private String chatAddress;
 
 
-    public Project(String projectname, User creator, String chatAddress, String projectdir){
+    public Project(String projectname, User creator, String chatAddress, FileHandler fileHandler){
         //initialize private project lists
         this.chatAddress = chatAddress;
         this.name   = projectname;
-        fileHandler = new FileHandler(projectdir);
+        this.fileHandler = fileHandler;
         todo        = new HashMap<>();
         inProgress  = new HashMap<>();
         toBeRevised = new HashMap<>();
@@ -45,11 +48,11 @@ public class Project {
         members.add(creator.getUsername());
     }
 
-    public Project(String projectname, ArrayList<String> members, String chatAddress, String projectdir){
+    public Project(String projectname, ArrayList<String> members, String chatAddress, FileHandler fileHandler){
         //initialize private project lists
         this.chatAddress = chatAddress;
         this.name   = projectname;
-        fileHandler = new FileHandler(projectdir);
+        this.fileHandler = fileHandler;
         todo        = new HashMap<>();
         inProgress  = new HashMap<>();
         toBeRevised = new HashMap<>();
@@ -76,7 +79,7 @@ public class Project {
 
         try {
             Card temp = cardLists.get(from).remove(name);
-            cardLists.get(to).put(name, temp);
+            cardLists.get(to).putIfAbsent(name, temp);
             temp.setStatus(to);
             fileHandler.saveCard(this.name, temp);
         }
@@ -93,6 +96,7 @@ public class Project {
     public void setChatAddress(String addr){
         this.chatAddress = addr;
     }
+
     public String getChatAddress(){
         return chatAddress;
     }
@@ -122,20 +126,20 @@ public class Project {
 
     public void addCard(Card card) throws CardAlreadyExistsException {
         if(cardExists(card.getName())) throw new CardAlreadyExistsException();
-        todo.put(card.getName(), card);
+        todo.putIfAbsent(card.getName(), card);
         fileHandler.saveCard(this.name, card);
     }
 
     public void addCard(String name, String desc) throws CardAlreadyExistsException {
         if(cardExists(name)) throw new CardAlreadyExistsException();
         Card c = new Card(name, desc);
-        todo.put(name, c);
+        todo.putIfAbsent(name, c);
         fileHandler.saveCard(this.name, c);
     }
 
     public void restoreCards(ArrayList<Card> cards){
         for(Card c : cards){
-            cardLists.get(c.getStatus()).put(c.getName(), c);
+            cardLists.get(c.getStatus()).putIfAbsent(c.getName(), c);
         }
     }
 

@@ -9,5 +9,4 @@ public interface RMIClientInterface extends Remote {
     void leaveGroup(String address, String projectname) throws RemoteException;
 
     String getUsername() throws RemoteException;
-
 }

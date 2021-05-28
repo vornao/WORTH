@@ -1,9 +1,5 @@
 package server;
 
-import com.google.gson.annotations.Expose;
-
-import java.net.SocketAddress;
-
 public class User {
 
     private int sessionHash;

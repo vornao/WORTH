@@ -33,7 +33,7 @@ public class RMIServer extends RemoteServer implements RMIServerInterface {
             String salt = PasswordHandler.salt();
             String hash = PasswordHandler.hash(password, salt);
             User u = new User(username, hash, salt);
-            userList.put(username, u);
+            userList.putIfAbsent(username, u);
             fh.saveUser(u);
 
         Printer.println("> DEBUG: REGISTER USER: USER CREATED", "blue");
