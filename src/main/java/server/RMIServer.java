@@ -57,6 +57,7 @@ public class RMIServer extends RemoteServer implements RMIServerInterface {
         }
     }
 
+    //implements online user state callback for clients.
     public synchronized void updateUsers(String username, Boolean status) throws RemoteException{
 
         //using an iterator to avoid ConcurrentModificationException for removing while iterating on collection
@@ -72,6 +73,10 @@ public class RMIServer extends RemoteServer implements RMIServerInterface {
         }
     }
 
+    /**
+     * implements callback to notify an online client that has been added to a project.
+     * client can now join project chats without user to manually update project lists.
+     */
     public synchronized void updateChat(String username, String projectname, String address) throws RemoteException{
         //using an iterator to avoid ConcurrentModificationException for removing while iterating on collection
         Iterator<RMIClientInterface> iterator = clients.iterator();

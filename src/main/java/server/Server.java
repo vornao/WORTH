@@ -146,83 +146,89 @@ public class Server {
 
         //parse message as JSON object to handle it easily
         Gson gson = new Gson();
-
-        JsonObject request = gson.fromJson(message, JsonObject.class);
+        JsonObject request = null;
         JsonObject response =  null;
 
-        //fetching requested method and computing response
-        assert request != null;
-        try {
-            switch (request.get("method").getAsString()) {
-                case "login":
-                    response = login(
-                            request.get("username").getAsString(),
-                            request.get("password").getAsString(),
-                            socketChannel.getRemoteAddress().hashCode());
-                    break;
-                case "logout":
-                    response = logout(request.get("username").getAsString());
-                    break;
-                case "create-project":
-                    response = addProject(
-                            request.get("projectname").getAsString(),
-                            request.get("username").getAsString());
-                    break;
-                case "list-projects":
-                    response = listProjects(request.get("username").getAsString());
-                    break;
-                case "add-member":
-                    response = addMember(request.get("username").getAsString(),
-                            request.get("new-member").getAsString(),
-                            request.get("projectname").getAsString());
-                    break;
-                case "show-members":
-                    response = showMembers(
-                            request.get("username").getAsString(),
-                            request.get("projectname").getAsString());
-                    break;
-                case "add-card":
-                    response = addCard(
-                            request.get("username").getAsString(),
-                            request.get("cardname").getAsString(),
-                            request.get("cardesc").getAsString(),
-                            request.get("projectname").getAsString());
-                    break;
-                case "show-card":
-                    response = showCard(
-                            request.get("username").getAsString(),
-                            request.get("projectname").getAsString(),
-                            request.get("cardname").getAsString());
-                    break;
-                case "move-card":
-                    response = moveCard(
-                            request.get("username").getAsString(),
-                            request.get("cardname").getAsString(),
-                            request.get("from").getAsString(),
-                            request.get("to").getAsString(),
-                            request.get("projectname").getAsString());
-                    break;
-                case "list-cards":
-                    response = listCards(
-                            request.get("username").getAsString(),
-                            request.get("projectname").getAsString());
-                    break;
-                case "get-card-history":
-                    response = getCardHistory(
-                            request.get("username").getAsString(),
-                            request.get("projectname").getAsString(),
-                            request.get("cardname").getAsString());
-                    break;
-                case "delete-project":
-                    response = deleteProject(
-                            request.get("username").getAsString(),
-                            request.get("projectname").getAsString());
-                    break;
-                default:
-                    break;
+        try{
+            request = gson.fromJson(message, JsonObject.class);
+            //fetching requested method and computing response
+            try {
+                assert request != null;
+                switch (request.get("method").getAsString()) {
+                    case "login":
+                        response = login(
+                                request.get("username").getAsString(),
+                                request.get("password").getAsString(),
+                                socketChannel.getRemoteAddress().hashCode());
+                        break;
+                    case "logout":
+                        response = logout(request.get("username").getAsString());
+                        break;
+                    case "create-project":
+                        response = addProject(
+                                request.get("projectname").getAsString(),
+                                request.get("username").getAsString());
+                        break;
+                    case "list-projects":
+                        response = listProjects(request.get("username").getAsString());
+                        break;
+                    case "add-member":
+                        response = addMember(request.get("username").getAsString(),
+                                request.get("new-member").getAsString(),
+                                request.get("projectname").getAsString());
+                        break;
+                    case "show-members":
+                        response = showMembers(
+                                request.get("username").getAsString(),
+                                request.get("projectname").getAsString());
+                        break;
+                    case "add-card":
+                        response = addCard(
+                                request.get("username").getAsString(),
+                                request.get("cardname").getAsString(),
+                                request.get("cardesc").getAsString(),
+                                request.get("projectname").getAsString());
+                        break;
+                    case "show-card":
+                        response = showCard(
+                                request.get("username").getAsString(),
+                                request.get("projectname").getAsString(),
+                                request.get("cardname").getAsString());
+                        break;
+                    case "move-card":
+                        response = moveCard(
+                                request.get("username").getAsString(),
+                                request.get("cardname").getAsString(),
+                                request.get("from").getAsString(),
+                                request.get("to").getAsString(),
+                                request.get("projectname").getAsString());
+                        break;
+                    case "list-cards":
+                        response = listCards(
+                                request.get("username").getAsString(),
+                                request.get("projectname").getAsString());
+                        break;
+                    case "get-card-history":
+                        response = getCardHistory(
+                                request.get("username").getAsString(),
+                                request.get("projectname").getAsString(),
+                                request.get("cardname").getAsString());
+                        break;
+                    case "delete-project":
+                        response = deleteProject(
+                                request.get("username").getAsString(),
+                                request.get("projectname").getAsString());
+                        break;
+                    default:
+                        break;
+                }
+            }catch (Exception e){
+                response = new JsonObject();
+                response.addProperty("return-code", 500);
             }
-        }catch (Exception e){
-            e.printStackTrace();
+        }catch (JsonSyntaxException e){
+            response = new JsonObject();
+            response.addProperty("return-code", 400);
         }
 
         assert response != null;
@@ -237,6 +243,7 @@ public class Server {
         socketChannel.register(selector, SelectionKey.OP_READ, buffer); //channel ready for new client requests.
     }
 
+    /** login method, uses RMI for user callback. See RMIServer.java for actual callback implementation. */
     private JsonObject login(String username, String password, int socketHash) throws RemoteException {
         JsonObject response = new JsonObject();
         User u =  registeredUsers.get(username);
@@ -269,6 +276,7 @@ public class Server {
         return response;
     }
 
+    /** performs user logout. Returning jsonObject  in case of failure or success either, just changes error code.*/
     private JsonObject logout(String username) throws RemoteException {
         JsonObject response = new JsonObject();
 
@@ -283,7 +291,16 @@ public class Server {
         return response;
     }
 
-    private JsonObject addProject(String projectname, String username) throws IOException {
+
+    /**
+     * @param projectname -> new project name.
+     * @param username -> user requesting for new project.
+     * @return new JsonObject with return code.
+     *
+     * Add project Projectname to project list. Different return codes if projectname already exists
+     * or user has not enough privileges to perform action.
+     */
+    private JsonObject addProject(String projectname, String username) {
         JsonObject response = new JsonObject();
         User u = registeredUsers.get(username);
 
@@ -305,12 +322,28 @@ public class Server {
 
         Project project = new Project(projectname, u, multicastAddress, fileHandler);
         projects.putIfAbsent(projectname, project);
-        rmiServer.updateChat(username, projectname, project.getChatAddress());
-        fileHandler.saveProject(project);
+        try {
+            rmiServer.updateChat(username, projectname, project.getChatAddress());
+            fileHandler.saveProject(project);
+        }catch (IOException e){
+            response.addProperty("return-code", 500);
+            return response;
+        }
 
         response.addProperty("return-code", 201);
         return response;
     }
+
+    /**
+     * @param username -> user requesting for action.
+     * @param cardname -> new card name.
+     * @param desc -> new card description.
+     * @param projectname -> existing project in which card will be created.
+     * @return new JsonObject with return code.
+     *
+     * Simply add new card to an existing project. If project does not exists, 401 error code is added to response
+     * if card already exists, code 409 is returned to client.
+     */
 
     private JsonObject addCard(String username, String cardname, String desc, String projectname){
         JsonObject response = new JsonObject();
@@ -335,6 +368,17 @@ public class Server {
         return response;
     }
 
+    /**
+     *
+     * @param username user demanding for action
+     * @param cardname card to move
+     * @param from starting list
+     * @param to destination list
+     * @param projectname project in which card has to be moved.
+     * @return JsonObject with 200 code in case of success, else 401 if unauthorized or not found, 405 if
+     * request does not meet card move constraints.
+     */
+
     private JsonObject moveCard(String username, String cardname, String from, String to, String projectname){
         //user is logged in, member and card exists in project.
         JsonObject response = new JsonObject();
@@ -355,6 +399,13 @@ public class Server {
         response.addProperty("return-code", 200);
         return response;
     }
+
+    /**
+     *
+     * @param username username demanding for action.
+     * @param projectname project name for card list.
+     * @return JsonObject with 200 success code and JsonArray with card list.
+     */
 
     private JsonObject listCards(String username, String projectname){
         JsonObject response = new JsonObject();
@@ -387,6 +438,14 @@ public class Server {
         }
     }
 
+    /**
+     *
+     * @param username user demanding for action.
+     * @param projectname project containing card.
+     * @param cardname card to show.
+     * @return JsonObject with card properties and success code 200, or error codes in case of card not found.
+     */
+
     private JsonObject showCard(String username, String projectname, String cardname){
         JsonObject response = new JsonObject();
         Project p = projects.get(projectname);
@@ -400,11 +459,19 @@ public class Server {
             response.addProperty("return-code", 200);
             response.add("card-info", p.getCardJson(cardname));
         }catch (CardNotFoundException e){
-            response.addProperty("return-code", 401);
+            response.addProperty("return-code", 404);
         }
         return response;
 
     }
+
+    /**
+     *
+     * @param username user demanding for action.
+     * @param projectname project containing card.
+     * @param cardname card to show.
+     * @return JsonObject with JsonArray containing card history.
+     */
 
     private JsonObject getCardHistory(String username, String projectname, String cardname){
         JsonObject response = new JsonObject();
@@ -435,6 +502,11 @@ public class Server {
         }
     }
 
+    /**
+     * @param username user demanding for action.
+     * @return JsonObject with JsonArray containing actual user's projects.
+     */
+
     private JsonObject listProjects(String username) {
         JsonObject response = new JsonObject();
 
@@ -457,6 +529,14 @@ public class Server {
         return response;
     }
 
+
+    /**
+     *
+     * @param username user demanding for action.
+     * @param projectname project to delete
+     * @return JsonObject with 200 code in case of success, other error codes in case of failure.
+     */
+
     private JsonObject deleteProject(String username, String projectname){
         JsonObject response = new JsonObject();
         Project p = projects.get(projectname);
@@ -478,7 +558,14 @@ public class Server {
         return response;
     }
 
-    private JsonObject addMember(String username, String newMember, String projectname) throws IOException {
+
+    /**
+     *
+     * @param username user demanding for action.
+     * @param newMember new member name.
+     * @return JsonObject with 201 code if success.
+     */
+    private JsonObject addMember(String username, String newMember, String projectname) {
         JsonObject response = new JsonObject();
 
         //check if current user is logged in
@@ -502,12 +589,25 @@ public class Server {
         }
 
         p.addMember(u);
-        rmiServer.updateChat(newMember, projectname, p.getChatAddress());
-        fileHandler.saveProject(p);
+
+        try {
+            rmiServer.updateChat(newMember, projectname, p.getChatAddress());
+            fileHandler.saveProject(p);
+        }catch (IOException e){
+            response.addProperty("return-code", 500);
+            return response;
+        }
         response.addProperty("return-code", 201);
         return response;
     }
 
+
+    /**
+     *
+     * @param username user demanding for action.
+     * @param projectname project to show
+     * @return JsonObject containing JsonArray with members list.
+     */
     private JsonObject showMembers(String username, String projectname){
         Project p = projects.get(projectname);
         JsonObject response = new JsonObject();
