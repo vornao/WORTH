@@ -72,6 +72,7 @@ public class WorthClient {
 
         ChatHelper chatHelper;
         Client client;
+
         try {
             chatHelper = new ChatHelper(CHAT_PORT, CHAT_SOCKET_ADDR);
             client = new Client(ADDRESS, TCP_PORT, RMI_PORT, REGISTRY_NAME, chatHelper);
@@ -155,7 +156,6 @@ public class WorthClient {
             }
         } catch (Exception e){
             Printer.println("Fatal IO exception. Check your connection status.", "red");
-            return;
         }
     }
 }

@@ -25,23 +25,16 @@ import java.util.concurrent.ConcurrentHashMap;
 //export CLASSPATH=$CLASSPATH:/Users/vornao/Developer/university/WORTH/lib/gson-2.8.6.jar
 
 public class Client {
-    private final int    RMI_SERVER_PORT;
-    private final int    PORT;
-    private final String REGISTRY_NAME;
-    private final String ADDRESS;
 
     private final SocketChannel socketChannel;
     private final ByteBuffer buffer;
     private final ConcurrentHashMap<String, Boolean> worthUsers = new ConcurrentHashMap<>();
-    private String loginName = null;
-
-    private RMIClient callbackAgent;
     private final ChatHelper chatHelper;
+    private String loginName = null;
+    private RMIClient callbackAgent;
     Registry registry;
     RMIServerInterface remote;
-
     Gson gson = new Gson();
-
 
     private static final HashMap<Integer, String> SignupErrorMessages = new HashMap<Integer, String>() {
         {
@@ -59,22 +52,19 @@ public class Client {
             put("401", Const.ANSI_RED+ "> ERROR: 401 - Unauthorized" + Const.ANSI_RESET);
             put("403", Const.ANSI_RED+ "> ERROR: 403 - Forbidden" + Const.ANSI_RESET);
             put("409", Const.ANSI_RED+ "> ERROR: 409 - Resource already exists" + Const.ANSI_RESET);
+            put("500", Const.ANSI_RED+ "> ERROR: 500 - Internal Server Error" + Const.ANSI_RESET);
         }
     };
 
     public Client(String address, int port, int rmiport, String registry, ChatHelper chatHelper) throws IOException, NotBoundException {
-        this.ADDRESS = address;
-        this.RMI_SERVER_PORT = rmiport;
-        this.REGISTRY_NAME = registry;
-        this.PORT = port;
         this.chatHelper = chatHelper;
-        this.registry = LocateRegistry.getRegistry(address, RMI_SERVER_PORT);
-        remote = (RMIServerInterface) this.registry.lookup(REGISTRY_NAME);
+        this.registry = LocateRegistry.getRegistry(address, rmiport);
+        remote = (RMIServerInterface) this.registry.lookup(registry);
 
         socketChannel = SocketChannel.open();
 
         try {
-            socketChannel.connect(new InetSocketAddress(ADDRESS, PORT));
+            socketChannel.connect(new InetSocketAddress(address, port));
         } catch (IOException e) {
             System.out.println(Const.ANSI_RED + "ERROR: Failed to connect to server." + Const.ANSI_RESET);
             System.exit(-1);
@@ -209,15 +199,16 @@ public class Client {
                 JsonObject o = e.getAsJsonObject();
                 chatHelper.joinGroup(o.get("chat-addr").getAsString(), o.get("name").getAsString());
             }
+            input.close();
 
         } catch (IOException | JsonIOException e) {
-            e.printStackTrace();
-            Printer.println("< ERROR: Error sending message to server", "red");
+            Printer.println("< ERROR: Error logging in", "red");
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            Printer.println("< ERROR: Error sending message to server", "red");
         }
 
         registerForCallback();
+
     }
 
     /**
@@ -284,6 +275,7 @@ public class Client {
 
         String returnCode = gson.fromJson(readSocket(), JsonObject.class).get("return-code").getAsString();
         System.out.println(returnCodes.get(returnCode));
+        input.close();
     }
 
     public void listProjects(){
@@ -314,6 +306,7 @@ public class Client {
         System.out.format("+-----------------+%n");
     }
 
+    //user may choose to display only online users or entire user list.
     public void listUsers(Boolean onlyOnlineUsers){
 
         if(loginName == null) {
@@ -376,7 +369,7 @@ public class Client {
         }
 
         System.out.format("+-----------------+%n");
-
+        input.close();
     }
 
     public void addMember() throws IOException {
@@ -400,6 +393,7 @@ public class Client {
 
         String returnCode = gson.fromJson(readSocket(), JsonObject.class).get("return-code").getAsString();
         System.out.println(returnCodes.get(returnCode));
+        input.close();
 
     }
 
@@ -429,6 +423,7 @@ public class Client {
         writeSocket(request.toString().getBytes());
         String returnCode = gson.fromJson(readSocket(), JsonObject.class).get("return-code").getAsString();
         System.out.println(returnCodes.get(returnCode));
+        input.close();
     }
 
     public void showCard() throws IOException{
@@ -455,12 +450,13 @@ public class Client {
         JsonObject cardJson = response.getAsJsonObject("card-info");
         String returnCode = response.get("return-code").getAsString();
 
-        if(!returnCode.equals("200")) System.out.println(returnCodes.get(returnCode));
-        else{
+        if(returnCode.equals("200")) {
             Printer.println("> Card Name: " + cardJson.get("name"), "yellow");
             Printer.println("> Card Description: " + cardJson.get("description"), "yellow");
             Printer.println("> Task Status: " + cardJson.get("currentlist"), "yellow");
         }
+        else System.out.println(returnCodes.get(returnCode));
+        input.close();
     }
 
     public void listCards() throws IOException{
@@ -499,6 +495,7 @@ public class Client {
                     e.getAsJsonObject().get("card-state").getAsString());
         }
         System.out.format("+-----------------+-------------+%n");
+        input.close();
     }
 
     public void moveCard() throws IOException{
@@ -541,6 +538,7 @@ public class Client {
                 Printer.print("> ERROR: Failed to send message: project not found.", "red");
             }
         }
+        input.close();
     }
 
     public void getCardHistory() throws IOException {
@@ -593,18 +591,7 @@ public class Client {
             System.out.format(rowFormat, start, end, date);
         }
         System.out.format("+-----------------+-------------+-------------------------+%n");
-
-    }
-
-    /** logout and quit client */
-    public void quit(){
-        if(loginName != null) logout();
-        System.exit(0);
-    }
-
-    public void clear(){
-        System.out.println("\033[H\033[2J");
-        System.out.flush();
+        input.close();
     }
 
     public void sendChat() throws IOException {
@@ -623,6 +610,7 @@ public class Client {
         }catch (ProjectNotFoundException e){
             Printer.print("> ERROR: Failed to send message: project not found.", "red");
         }
+        input.close();
     }
 
     public void readChat() throws IOException  {
@@ -637,7 +625,7 @@ public class Client {
         String projectname = input.readLine();
         List<String> messages = chatHelper.getProjectMessages(projectname);
 
-        if(messages == null || messages.size() == 0){
+        if(messages.isEmpty()){
             Printer.println("> No messages to show for " + projectname, "green");
             return;
         }
@@ -648,9 +636,9 @@ public class Client {
             Printer.println("- " + iterator.next(), "purple");
             iterator.remove();
         }
+        input.close();
     }
 
-    //todo server side delete files associated with project
     public void deleteProject() throws IOException {
         if(loginName == null){
             Printer.println("< ERROR: you must log in before adding new users", "red");
@@ -689,6 +677,9 @@ public class Client {
 
     }
 
+    /**
+     * Private methods to read and write socket, avoid code duplicates.
+     */
     private void writeSocket(byte[] request){
         try {
             buffer.clear();
@@ -730,6 +721,12 @@ public class Client {
             e.printStackTrace();
             Printer.println("> ERROR: (RMI) cannot subscribe to server callback", "red");
         }
+    }
+
+    /** logout and quit client */
+    public void quit(){
+        if(loginName != null) logout();
+        System.exit(0);
     }
 
 }

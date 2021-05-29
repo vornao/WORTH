@@ -26,7 +26,6 @@ public class Project {
     private final ArrayList<String> members;
     private String chatAddress;
 
-
     public Project(String projectname, User creator, String chatAddress, FileHandler fileHandler){
         //initialize private project lists
         this.chatAddress = chatAddress;
