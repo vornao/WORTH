@@ -1,6 +1,5 @@
 ## University Project for Network lab course.  
-
-![logo](https://www.code-inspector.com/project/22413/score/svg)  
+  
 ![grade](https://www.code-inspector.com/project/22413/status/svg)
 
 ---
