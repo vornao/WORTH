@@ -1,6 +1,7 @@
 ## University Project for Network lab course.  
   
 ![grade](https://api.codiga.io/project/22413/score/svg)
+![grade](https://api.codiga.io/project/22413/status/svg)
 
 ---
 
